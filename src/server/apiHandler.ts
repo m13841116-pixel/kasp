@@ -1,5 +1,9 @@
 import { Router, Request, Response, NextFunction } from 'express';
+<<<<<<< HEAD
 import { queryAll, queryOne, execute } from './db';
+=======
+import { queryAll, queryOne, execute } from './db.js';
+>>>>>>> 0d0eb5a (Initial commit)
 import { z } from 'zod';
 import bcrypt from 'bcryptjs';
 import { GoogleGenAI } from '@google/genai';

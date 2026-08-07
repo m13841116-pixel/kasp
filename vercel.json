@@ -1,9 +1,12 @@
 {
   "version": 2,
   "functions": {
+<<<<<<< HEAD
     "api/*.js": {
       "includeFiles": "node_modules/sql.js/dist/sql-wasm.wasm"
     },
+=======
+>>>>>>> 0d0eb5a (Initial commit)
     "api/*.ts": {
       "includeFiles": "node_modules/sql.js/dist/sql-wasm.wasm"
     }
@@ -11,7 +14,11 @@
   "rewrites": [
     {
       "source": "/api/(.*)",
+<<<<<<< HEAD
       "destination": "/api/index.js"
+=======
+      "destination": "/api/index.ts"
+>>>>>>> 0d0eb5a (Initial commit)
     }
   ]
 }

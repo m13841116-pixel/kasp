@@ -7,8 +7,13 @@ import cors from 'cors';
 import hpp from 'hpp';
 import cookieParser from 'cookie-parser';
 import { createServer as createViteServer } from 'vite';
+<<<<<<< HEAD
 import apiRouter from './src/server/apiHandler';
 import { initDb } from './src/server/db';
+=======
+import apiRouter from './src/server/apiHandler.js';
+import { initDb } from './src/server/db.js';
+>>>>>>> 0d0eb5a (Initial commit)
 
 dotenv.config();
 
