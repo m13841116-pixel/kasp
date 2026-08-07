@@ -1,6 +1,0 @@
-{
-  "name": "Kasp.ir",
-  "description": "Innovative AI Micro-Startups & Custom App Development platform featuring AI Agents showcase, Custom App request with AI Idea Analyzer, and full Admin Dashboard with Freelancer CRM.",
-  "requestFramePermissions": ["microphone"],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
-}
