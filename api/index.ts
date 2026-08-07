@@ -75,4 +75,13 @@ app.use(async (req, res, next) => {
 app.use('/api', apiRouter);
 app.use('/', apiRouter);
 
+
+
+// Global error handler
+app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+  console.error('Global Error Handler:', err);
+  res.status(500).json({ success: false, error: 'خطای سرور: ' + (err.message || 'نامشخص') });
+});
+
+
 export default app;
