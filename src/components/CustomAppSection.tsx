@@ -558,6 +558,30 @@ export const CustomAppSection: React.FC<CustomAppSectionProps> = ({
                           <h3 className="text-2xl font-black text-slate-900 dark:text-white mb-1">توضیحات تکمیلی پروژه و کد تخفیف</h3>
                           <p className="text-slate-500 dark:text-slate-400 text-xs sm:text-sm">هیچ محدودیتی در نوشتن جزییات وجود ندارد. اگر کد تخفیف از گردونه شانس دریافت کرده‌اید وارد نمایید.</p>
                         </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-2">نام شما *</label>
+                            <input
+                              type="text"
+                              required
+                              value={formData.customerName}
+                              onChange={(e) => setFormData({...formData, customerName: e.target.value})}
+                              placeholder="علی رضایی"
+                              className="w-full px-5 py-3.5 bg-white dark:bg-slate-900 border-2 border-slate-200 dark:border-slate-700 rounded-xl focus:border-indigo-500 focus:outline-none text-sm text-slate-900 dark:text-white"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-2">شماره تماس *</label>
+                            <input
+                              type="text"
+                              required
+                              value={formData.customerPhone}
+                              onChange={(e) => setFormData({...formData, customerPhone: e.target.value})}
+                              placeholder="09123456789"
+                              className="w-full px-5 py-3.5 bg-white dark:bg-slate-900 border-2 border-slate-200 dark:border-slate-700 rounded-xl focus:border-indigo-500 focus:outline-none text-sm text-slate-900 dark:text-white dir-ltr text-left"
+                            />
+                          </div>
+                        </div>
                         <textarea
                           value={formData.description}
                           onChange={(e) => setFormData({...formData, description: e.target.value})}
@@ -604,7 +628,8 @@ export const CustomAppSection: React.FC<CustomAppSectionProps> = ({
                     onClick={step === 8 ? submitForm : nextStep}
                     disabled={
                       (step === 1 && !formData.type) ||
-                      (step === 2 && !formData.businessName.trim())
+                      (step === 2 && !formData.businessName.trim()) ||
+                      (step === 8 && (!formData.customerName.trim() || !formData.customerPhone.trim()))
                     }
                     className="flex items-center gap-2 px-8 py-3.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-extrabold text-xs sm:text-sm shadow-xl shadow-indigo-500/25 transition-all hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed group"
                   >

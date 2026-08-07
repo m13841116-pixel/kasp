@@ -1,8 +1,8 @@
-
 import React, { useState } from 'react';
-import { Lock, Loader2, AlertCircle, KeyRound, Sparkles, User, Mail, UserPlus, LogIn } from 'lucide-react';
+import { Lock, Loader2, AlertCircle, KeyRound, Sparkles, User, Mail, UserPlus, LogIn, ArrowRight } from 'lucide-react';
 import { KaspLogo } from './KaspLogo';
 import { apiFetch } from '../utils/api';
+import { motion, AnimatePresence } from 'motion/react';
 
 interface AuthFormProps {
   initialMode?: 'login' | 'signup';
@@ -38,6 +38,7 @@ export const AuthForm: React.FC<AuthFormProps> = ({ initialMode = 'login', onLog
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       });
+
       const data = await res.json();
       
       if (res.ok && data.success) {
@@ -47,13 +48,16 @@ export const AuthForm: React.FC<AuthFormProps> = ({ initialMode = 'login', onLog
         if (data.csrfToken) {
           localStorage.setItem('csrf_token', data.csrfToken);
         }
-        onLoginSuccess(data.role);
+        // Small delay for smooth UX
+        setTimeout(() => {
+          onLoginSuccess(data.role);
+        }, 500);
       } else {
         setErrorMessage(data.error || (mode === 'login' ? 'رمز عبور یا نام کاربری اشتباه است.' : 'خطا در ثبت نام'));
+        setIsLoading(false);
       }
     } catch (err) {
-      setErrorMessage('ارتباط با سرور برقرار نشد.');
-    } finally {
+      setErrorMessage('ارتباط با سرور برقرار نشد. لطفا وضعیت اینترنت خود را بررسی کنید.');
       setIsLoading(false);
     }
   };
@@ -65,117 +69,156 @@ export const AuthForm: React.FC<AuthFormProps> = ({ initialMode = 'login', onLog
   };
 
   return (
-    <div className="min-h-[70vh] flex items-center justify-center p-4">
-      <div className="w-full max-w-md bg-white dark:bg-slate-900/80 backdrop-blur-md p-8 rounded-3xl border border-slate-200 dark:border-slate-700/80 shadow-2xl space-y-6 relative overflow-hidden">
-        
-        <div className="absolute -top-20 -right-20 w-48 h-48 bg-purple-600/10 dark:bg-purple-600/20 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute -bottom-20 -left-20 w-48 h-48 bg-blue-600/10 dark:bg-blue-600/20 rounded-full blur-3xl pointer-events-none" />
+    <div className="min-h-[80vh] flex items-center justify-center p-4">
+      <motion.div 
+        initial={{ opacity: 0, y: 20, scale: 0.95 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        transition={{ duration: 0.5, ease: "easeOut" }}
+        className="w-full max-w-lg bg-[#0b0f19] p-8 md:p-12 rounded-3xl border border-slate-800 shadow-2xl relative overflow-hidden"
+      >
+        {/* Glow Effects */}
+        <div className="absolute top-0 right-0 w-64 h-64 bg-purple-600/10 rounded-full blur-[80px] pointer-events-none" />
+        <div className="absolute bottom-0 left-0 w-64 h-64 bg-blue-600/10 rounded-full blur-[80px] pointer-events-none" />
 
-        <div className="text-center space-y-3 relative z-10">
-          <div className="flex justify-center mb-4">
-            <KaspLogo size="md" showTagline={false} />
-          </div>
-          <div>
-            <div className="flex items-center justify-center gap-2">
-              <span className="text-2xl font-black text-slate-900 dark:text-white">
-                {mode === 'login' ? 'ورود به سیستم' : 'ایجاد حساب کاربری'}
-              </span>
-              <Sparkles className="w-4 h-4 text-amber-500 dark:text-amber-400" />
+        <div className="text-center space-y-4 relative z-10 mb-8">
+          <motion.div 
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            transition={{ type: "spring", stiffness: 200, damping: 15, delay: 0.2 }}
+            className="flex justify-center mb-6"
+          >
+            <div className="p-4 bg-slate-900/50 rounded-2xl border border-slate-800 backdrop-blur-xl">
+              <KaspLogo size="lg" showTagline={false} />
             </div>
-            <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">
+          </motion.div>
+
+          <div>
+            <h1 className="text-3xl font-black text-white flex items-center justify-center gap-3">
+              {mode === 'login' ? 'خوش آمدید' : 'شروع کنیم'}
+              <Sparkles className="w-6 h-6 text-amber-400 animate-pulse" />
+            </h1>
+            <p className="text-slate-400 mt-3 text-sm md:text-base leading-relaxed">
               {mode === 'login' 
-                ? 'جهت دسترسی به داشبورد، اطلاعات کاربری خود را وارد کنید.'
-                : 'برای ثبت سفارش و پیگیری پروژه‌ها ثبت‌نام کنید.'}
+                ? 'برای دسترسی به پنل کاربری، اطلاعات خود را وارد کنید.'
+                : 'با ایجاد حساب کاربری به تمام امکانات دسترسی داشته باشید.'}
             </p>
           </div>
         </div>
 
-        {errorMessage && (
-          <div className="p-3.5 rounded-2xl bg-rose-50 dark:bg-rose-500/15 border border-rose-200 dark:border-rose-500/30 text-rose-700 dark:text-rose-300 text-xs font-semibold flex items-center gap-2">
-            <AlertCircle className="w-4 h-4 shrink-0 text-rose-500 dark:text-rose-400" />
-            <span>{errorMessage}</span>
-          </div>
-        )}
+        <AnimatePresence mode="wait">
+          {errorMessage && (
+            <motion.div 
+              initial={{ opacity: 0, height: 0, marginBottom: 0 }}
+              animate={{ opacity: 1, height: 'auto', marginBottom: 24 }}
+              exit={{ opacity: 0, height: 0, marginBottom: 0 }}
+              className="overflow-hidden"
+            >
+              <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-sm font-medium flex items-center gap-3">
+                <AlertCircle className="w-5 h-5 shrink-0" />
+                <span>{errorMessage}</span>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         <form onSubmit={handleSubmit} className="space-y-5 relative z-10">
-          {mode === 'signup' && (
-            <div>
-              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-2 flex items-center gap-1.5">
-                <User className="w-4 h-4 text-purple-600 dark:text-purple-400" />
-                <span>نام و نام خانوادگی</span>
-              </label>
+          <AnimatePresence mode="popLayout">
+            {mode === 'signup' && (
+              <motion.div
+                initial={{ opacity: 0, y: -20, height: 0 }}
+                animate={{ opacity: 1, y: 0, height: 'auto' }}
+                exit={{ opacity: 0, y: -20, height: 0 }}
+                transition={{ duration: 0.3 }}
+              >
+                <label className="block text-sm font-semibold text-slate-300 mb-2 flex items-center gap-2">
+                  <User className="w-4 h-4 text-purple-400" />
+                  <span>نام و نام خانوادگی</span>
+                </label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    required
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="مثال: علی رضایی"
+                    className="w-full pl-4 pr-4 py-4 rounded-2xl bg-slate-900/50 border border-slate-700/50 text-white text-sm focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition-all text-right placeholder-slate-600"
+                  />
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          <div>
+            <label className="block text-sm font-semibold text-slate-300 mb-2 flex items-center gap-2">
+              <Mail className="w-4 h-4 text-blue-400" />
+              <span>شماره موبایل یا ایمیل</span>
+            </label>
+            <div className="relative">
               <input
                 type="text"
                 required
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="مثال: علی رضایی"
-                className="w-full px-4 py-3.5 rounded-xl bg-slate-50 dark:bg-slate-900/90 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white text-sm focus:outline-none focus:border-purple-500 transition-colors text-right"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                placeholder="09123456789 یا email@example.com"
+                className="w-full pl-4 pr-4 py-4 rounded-2xl bg-slate-900/50 border border-slate-700/50 text-white text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all dir-ltr text-left placeholder-slate-600"
               />
             </div>
-          )}
-
-          <div>
-            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-2 flex items-center gap-1.5">
-              <Mail className="w-4 h-4 text-purple-600 dark:text-purple-400" />
-              <span>شماره موبایل یا ایمیل</span>
-            </label>
-            <input
-              type="text"
-              required
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              placeholder="مثال: 09123456789"
-              className="w-full px-4 py-3.5 rounded-xl bg-slate-50 dark:bg-slate-900/90 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white text-sm focus:outline-none focus:border-purple-500 transition-colors dir-ltr text-left"
-            />
           </div>
 
           <div>
-            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-2 flex items-center gap-1.5">
-              <KeyRound className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+            <label className="block text-sm font-semibold text-slate-300 mb-2 flex items-center gap-2">
+              <KeyRound className="w-4 h-4 text-teal-400" />
               <span>رمز عبور</span>
             </label>
-            <input
-              type="password"
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
-              className="w-full px-4 py-3.5 rounded-xl bg-slate-50 dark:bg-slate-900/90 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white text-sm focus:outline-none focus:border-purple-500 transition-colors dir-ltr text-left"
-            />
+            <div className="relative">
+              <input
+                type="password"
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••"
+                className="w-full pl-4 pr-4 py-4 rounded-2xl bg-slate-900/50 border border-slate-700/50 text-white text-sm focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500 transition-all dir-ltr text-left tracking-widest placeholder-slate-600"
+              />
+            </div>
           </div>
 
-          <button
+          <motion.button
+            whileHover={{ scale: 1.01 }}
+            whileTap={{ scale: 0.98 }}
             type="submit"
             disabled={isLoading || !username || !password || (mode === 'signup' && !name)}
-            className="w-full py-4 px-6 rounded-xl bg-gradient-to-l from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white font-bold text-sm shadow-lg shadow-purple-500/25 flex items-center justify-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed border border-white/10"
+            className="w-full mt-6 py-4 px-6 rounded-2xl bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white font-bold text-base shadow-[0_0_20px_rgba(124,58,237,0.3)] flex items-center justify-center gap-3 transition-all disabled:opacity-50 disabled:cursor-not-allowed group"
           >
             {isLoading ? (
-              <Loader2 className="w-5 h-5 animate-spin" />
+              <Loader2 className="w-6 h-6 animate-spin" />
             ) : mode === 'login' ? (
               <>
-                <LogIn className="w-5 h-5" />
-                <span>ورود به پنل</span>
+                <LogIn className="w-5 h-5 transition-transform group-hover:-translate-x-1" />
+                <span>ورود به حساب</span>
               </>
             ) : (
               <>
-                <UserPlus className="w-5 h-5" />
-                <span>ثبت‌نام در سیستم</span>
+                <UserPlus className="w-5 h-5 transition-transform group-hover:-translate-x-1" />
+                <span>ایجاد حساب کاربری</span>
               </>
             )}
-          </button>
+          </motion.button>
         </form>
 
-        <div className="relative z-10 text-center pt-2">
+        <div className="relative z-10 text-center mt-8 pt-6 border-t border-slate-800">
+          <p className="text-slate-400 mb-4 text-sm">
+            {mode === 'login' ? 'حساب کاربری ندارید؟' : 'قبلاً ثبت‌نام کرده‌اید؟'}
+          </p>
           <button
             type="button"
             onClick={toggleMode}
-            className="text-sm text-purple-400 hover:text-purple-300 font-medium transition-colors"
+            className="flex items-center justify-center gap-2 mx-auto text-sm text-purple-400 hover:text-purple-300 font-bold transition-colors group"
           >
-            {mode === 'login' ? 'حساب کاربری ندارید؟ ثبت‌نام کنید' : 'قبلاً ثبت‌نام کرده‌اید؟ وارد شوید'}
+            <span>{mode === 'login' ? 'همین حالا ثبت‌نام کنید' : 'وارد حساب خود شوید'}</span>
+            <ArrowRight className="w-4 h-4 transition-transform group-hover:-translate-x-1" />
           </button>
         </div>
-      </div>
+      </motion.div>
     </div>
   );
 };
