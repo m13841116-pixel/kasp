@@ -19,15 +19,19 @@ interface DashboardModuleProps {
 }
 
 export const DashboardModule: React.FC<DashboardModuleProps> = ({
-  agents,
-  freelancers,
-  requests,
+  agents = [],
+  freelancers = [],
+  requests = [],
   lang,
 }) => {
-  const totalSubscribers = agents.reduce((sum, a) => sum + a.subscribers, 0);
-  const activeAgentsCount = agents.filter(a => a.status === 'Active').length;
-  const totalFreelancersCount = freelancers.length;
-  const pendingRequestsCount = requests.filter(r => r.status === 'Pending' || r.status === 'Analyzed').length;
+  const safeAgents = Array.isArray(agents) ? agents : [];
+  const safeFreelancers = Array.isArray(freelancers) ? freelancers : [];
+  const safeRequests = Array.isArray(requests) ? requests : [];
+
+  const totalSubscribers = safeAgents.reduce((sum, a) => sum + (a.subscribers || 0), 0);
+  const activeAgentsCount = safeAgents.filter(a => a.status === 'Active').length;
+  const totalFreelancersCount = safeFreelancers.length;
+  const pendingRequestsCount = safeRequests.filter(r => r.status === 'Pending' || r.status === 'Analyzed').length;
 
   return (
     <div className="space-y-8 animate-fadeIn">
@@ -69,7 +73,7 @@ export const DashboardModule: React.FC<DashboardModuleProps> = ({
             </div>
           </div>
           <p className="text-2xl font-black text-slate-900 dark:text-white mt-3">
-            {activeAgentsCount} / {agents.length}
+            {activeAgentsCount} / {safeAgents.length}
           </p>
           <p className="text-[11px] text-slate-500 mt-2">
             {totalSubscribers} {lang === 'fa' ? 'مشترک فعال روی ساب‌دومین‌ها' : 'subscribers across subdomains'}
@@ -84,10 +88,10 @@ export const DashboardModule: React.FC<DashboardModuleProps> = ({
             </div>
           </div>
           <p className="text-2xl font-black text-slate-900 dark:text-white mt-3">
-            {requests.filter(r => r.status === 'InProgress').length} <span className="text-xs font-normal text-slate-400">{lang === 'fa' ? 'پروژه' : 'projects'}</span>
+            {safeRequests.filter(r => r.status === 'InProgress').length} <span className="text-xs font-normal text-slate-400">{lang === 'fa' ? 'پروژه' : 'projects'}</span>
           </p>
           <p className="text-[11px] text-slate-500 mt-2">
-            {requests.filter(r => r.status === 'InProgress').length} {lang === 'fa' ? 'پروژه در حال توسعه' : 'projects under development'}
+            {safeRequests.filter(r => r.status === 'InProgress').length} {lang === 'fa' ? 'پروژه در حال توسعه' : 'projects under development'}
           </p>
         </div>
 
@@ -99,7 +103,7 @@ export const DashboardModule: React.FC<DashboardModuleProps> = ({
             </div>
           </div>
           <p className="text-2xl font-black text-slate-900 dark:text-white mt-3">
-            {requests.length} <span className="text-xs font-normal text-slate-400">{lang === 'fa' ? 'درخواست' : 'requests'}</span>
+            {safeRequests.length} <span className="text-xs font-normal text-slate-400">{lang === 'fa' ? 'درخواست' : 'requests'}</span>
           </p>
           <p className="text-[11px] text-amber-500 font-semibold mt-2">
             {pendingRequestsCount} {lang === 'fa' ? 'در انتظار بررسی اولیه' : 'pending AI analysis'}
@@ -127,7 +131,7 @@ export const DashboardModule: React.FC<DashboardModuleProps> = ({
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200/60 dark:divide-slate-800 text-slate-700 dark:text-slate-300">
-              {requests.map((req) => (
+              {safeRequests.map((req) => (
                 <tr key={req.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
                   <td className="p-3 font-bold text-slate-900 dark:text-white text-right">{req.userName}</td>
                   <td className="p-3 font-mono text-[11px] text-blue-400 text-right">{req.contactInfo}</td>

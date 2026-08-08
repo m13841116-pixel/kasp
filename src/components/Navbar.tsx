@@ -1,5 +1,5 @@
 import React from 'react';
-import { LayoutDashboard, Code, ArrowLeft } from 'lucide-react';
+import { LayoutDashboard, Code, ArrowLeft, User, LogOut } from 'lucide-react';
 import { KaspLogo } from './KaspLogo';
 
 interface NavbarProps {
@@ -10,6 +10,10 @@ interface NavbarProps {
   onScrollToSection: (sectionId: string) => void;
   onOpenTicketModal?: () => void;
   onOpenAuth?: (mode: 'login' | 'signup') => void;
+  isAuthenticated?: boolean;
+  userRole?: 'admin' | 'customer' | null;
+  currentUser?: { id?: string; name?: string; email?: string; role?: string } | null;
+  onLogout?: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -17,7 +21,13 @@ export const Navbar: React.FC<NavbarProps> = ({
   setActiveTab,
   onScrollToSection,
   onOpenAuth,
+  isAuthenticated,
+  userRole,
+  currentUser,
+  onLogout,
 }) => {
+  const userName = currentUser?.name || currentUser?.email || (userRole === 'admin' ? 'مدیر سیستم' : 'کاربر محترم');
+
   return (
     <header className="sticky top-0 z-50 glass-panel border-b border-slate-200/50 dark:border-slate-800/80 transition-colors duration-300">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
@@ -80,19 +90,45 @@ export const Navbar: React.FC<NavbarProps> = ({
           </a>
 
           {/* User Auth Actions */}
-          {activeTab === 'landing' ? (
+          {isAuthenticated ? (
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setActiveTab('admin')}
+                className="px-4 py-2.5 rounded-xl bg-purple-600/10 hover:bg-purple-600/20 text-purple-700 dark:text-purple-300 border border-purple-500/30 font-bold text-xs flex items-center gap-2 transition-all hover:scale-[1.02]"
+                title="مشاهده حساب و داشبورد"
+              >
+                <User className="w-4 h-4 text-purple-600 dark:text-purple-400 shrink-0" />
+                <span className="max-w-[120px] sm:max-w-[180px] truncate">{userName}</span>
+              </button>
+
+              {activeTab === 'admin' ? (
+                <button
+                  onClick={() => setActiveTab('landing')}
+                  className="px-3.5 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 font-bold text-xs border border-slate-200 dark:border-slate-700 flex items-center gap-1.5 transition-all"
+                  title="صفحه اصلی"
+                >
+                  <span className="hidden sm:inline">صفحه اصلی</span>
+                  <ArrowLeft className="w-4 h-4" />
+                </button>
+              ) : (
+                onLogout && (
+                  <button
+                    onClick={onLogout}
+                    className="p-2.5 rounded-xl bg-slate-100 dark:bg-slate-800/80 hover:bg-rose-500/10 text-slate-500 hover:text-rose-600 dark:hover:text-rose-400 border border-slate-200 dark:border-slate-800 transition-colors"
+                    title="خروج از حساب کاربری"
+                  >
+                    <LogOut className="w-4 h-4" />
+                  </button>
+                )
+              )}
+            </div>
+          ) : activeTab === 'landing' ? (
             <div className="flex items-center gap-2">
               <button
                 onClick={() => onOpenAuth ? onOpenAuth('login') : setActiveTab('admin')}
-                className="px-4 py-2.5 rounded-xl bg-transparent hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold text-xs transition-colors"
+                className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white font-bold text-xs shadow-lg shadow-purple-500/25 flex items-center gap-2 hover:scale-[1.02] transition-transform"
               >
-                ورود
-              </button>
-              <button
-                onClick={() => onOpenAuth ? onOpenAuth('signup') : setActiveTab('admin')}
-                className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white font-bold text-xs shadow-lg shadow-purple-500/25 flex items-center gap-2 hover:scale-[1.02] transition-transform"
-              >
-                ثبت نام
+                ورود / ثبت‌نام
               </button>
             </div>
           ) : (

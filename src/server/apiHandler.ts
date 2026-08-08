@@ -91,6 +91,14 @@ router.post('/auth/login', async (req, res) => {
     }
   } else if (isAdminCredentials) {
     isAuthenticated = true;
+  } else if (!user) {
+    // Unified Login/Signup: User not found, so register them
+    const id = `usr-${crypto.randomUUID()}`;
+    const hashed = bcrypt.hashSync(password, 10);
+    const defaultName = cleanEmail.split('@')[0] || 'کاربر جدید';
+    await execute("INSERT INTO users (id, name, email, password, role) VALUES (?, ?, ?, ?, ?)", [id, defaultName, cleanEmail, hashed, 'customer']);
+    user = await queryOne("SELECT * FROM users WHERE id = ?", [id]);
+    isAuthenticated = true;
   }
 
   if (isAuthenticated) {
@@ -161,8 +169,36 @@ router.post('/admin/wheel-settings', isAdmin, async (req, res) => {
 });
 
 router.get('/admin/discount-codes', isAdmin, async (req, res) => {
-  const codes = await queryAll("SELECT * FROM discount_codes ORDER BY createdAt DESC");
-  res.json(codes);
+  const codes = (await queryAll("SELECT * FROM discount_codes ORDER BY createdAt DESC")) || [];
+  const users = (await queryAll("SELECT id, name, email FROM users")) || [];
+  const userMap = new Map(users.map((u: any) => [u.id, u]));
+
+  const enriched = codes.map((c: any) => ({
+    ...c,
+    assignedUser: c.assignedUserId ? userMap.get(c.assignedUserId) || { name: 'کاربر نامشخص', email: '' } : null
+  }));
+  res.json(enriched);
+});
+
+router.post('/admin/discount-codes', isAdmin, async (req, res) => {
+  const { code, prize, discountPercent, assignedUserId, expiresAt } = req.body;
+  if (!code || !prize) return res.status(400).json({ error: 'کد و عنوان تخفیف الزامی است.' });
+  
+  const cleanCode = code.trim().toUpperCase();
+  const existing = await queryOne("SELECT code FROM discount_codes WHERE code = ?", [cleanCode]);
+  if (existing) return res.status(400).json({ error: 'این کد تخفیف قبلاً تعریف شده است.' });
+
+  await execute(
+    "INSERT INTO discount_codes (code, prize, discountPercent, isUsed, assignedUserId, expiresAt, createdAt) VALUES (?, ?, ?, 0, ?, ?, ?)",
+    [cleanCode, prize, discountPercent || 0, assignedUserId || null, expiresAt || null, new Date().toISOString()]
+  );
+  res.json({ success: true, code: cleanCode });
+});
+
+router.delete('/admin/discount-codes/:code', isAdmin, async (req, res) => {
+  const { code } = req.params;
+  await execute("DELETE FROM discount_codes WHERE code = ?", [code.trim().toUpperCase()]);
+  res.json({ success: true });
 });
 
 router.post('/wheel/save-code', async (req, res) => {
@@ -353,12 +389,20 @@ router.post('/payments/submit-receipt', async (req, res) => {
 });
 
 router.get('/customer/dashboard', async (req, res) => {
-  const userId = req.cookies.user_session;
-  if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+  const user = await getSessionUser(req);
+  if (!user) return res.status(401).json({ error: 'Unauthorized' });
+  const userId = user.id;
   
-  const tickets = await queryAll("SELECT * FROM tickets WHERE userId = ?", [userId]);
-  const receipts = await queryAll("SELECT * FROM payment_receipts WHERE userId = ?", [userId]);
-  res.json({ tickets, receipts });
+  const tickets = (await queryAll("SELECT * FROM tickets WHERE userId = ?", [userId])) || [];
+  const receipts = (await queryAll("SELECT * FROM payment_receipts WHERE userId = ?", [userId])) || [];
+  const requests = (await queryAll("SELECT * FROM app_requests WHERE contactInfo LIKE ? OR userName LIKE ?", [`%${user.email}%`, `%${user.name}%`])) || [];
+  
+  const allDiscounts = (await queryAll("SELECT * FROM discount_codes ORDER BY createdAt DESC")) || [];
+  const discountCodes = allDiscounts.filter((c: any) => 
+    !c.assignedUserId || c.assignedUserId === '' || c.assignedUserId === 'ALL' || c.assignedUserId === userId
+  );
+
+  res.json({ requests, tickets, receipts, discountCodes });
 });
 
 // Admin APIs (Protected)
@@ -557,6 +601,47 @@ router.put('/admin/banner-config', isAdmin, async (req, res) => {
     res.json({ success: true });
   } catch (err) {
     res.status(400).json({ error: 'اطلاعات نامعتبر است' });
+  }
+});
+
+// Admin User Management APIs
+router.get('/admin/users', isAdmin, async (req, res) => {
+  const users = await queryAll("SELECT id, name, email, role FROM users");
+  res.json(users || []);
+});
+
+const userMessageSchema = z.object({
+  userId: z.string().optional(),
+  allUsers: z.boolean().optional(),
+  title: z.string().min(1),
+  message: z.string().min(1)
+});
+
+router.post('/admin/users/message', isAdmin, async (req, res) => {
+  try {
+    const parsed = userMessageSchema.parse(req.body);
+    if (parsed.allUsers) {
+      const allCustomers = await queryAll("SELECT id FROM users WHERE role != 'admin'");
+      for (const u of (allCustomers || [])) {
+        const ticketId = `msg-${crypto.randomUUID()}`;
+        await execute(
+          "INSERT INTO tickets (id, title, description, status, userId) VALUES (?, ?, ?, ?, ?)",
+          [ticketId, parsed.title, parsed.message, 'پیام مدیریت', u.id]
+        );
+      }
+      return res.json({ success: true, count: (allCustomers || []).length });
+    } else if (parsed.userId) {
+      const ticketId = `msg-${crypto.randomUUID()}`;
+      await execute(
+        "INSERT INTO tickets (id, title, description, status, userId) VALUES (?, ?, ?, ?, ?)",
+        [ticketId, parsed.title, parsed.message, 'پیام مدیریت', parsed.userId]
+      );
+      return res.json({ success: true, count: 1 });
+    } else {
+      return res.status(400).json({ error: 'کاربر دریافت‌کننده پیام مشخص نشده است.' });
+    }
+  } catch (err) {
+    res.status(400).json({ error: 'اطلاعات پیام نامعتبر است.' });
   }
 });
 

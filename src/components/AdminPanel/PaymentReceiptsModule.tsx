@@ -14,7 +14,7 @@ export const PaymentReceiptsModule: React.FC = () => {
     apiFetch('/api/admin/payment-receipts')
       .then(res => res.json())
       .then(data => {
-        if (!data.error) setReceipts(data);
+        if (Array.isArray(data)) setReceipts(data);
         setLoading(false);
       })
       .catch(() => setLoading(false));

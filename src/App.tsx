@@ -32,11 +32,13 @@ import { apiFetch, getCsrfToken } from './utils/api';
 // Lazy loading Admin components for performance and code-splitting
 const Sidebar = lazy(() => import('./components/AdminPanel/Sidebar').then(m => ({ default: m.Sidebar })));
 const DashboardModule = lazy(() => import('./components/AdminPanel/DashboardModule').then(m => ({ default: m.DashboardModule })));
+const ManageUsersModule = lazy(() => import('./components/AdminPanel/ManageUsersModule').then(m => ({ default: m.ManageUsersModule })));
 const ManageAgentsModule = lazy(() => import('./components/AdminPanel/ManageAgentsModule').then(m => ({ default: m.ManageAgentsModule })));
 const ManageServicesModule = lazy(() => import('./components/AdminPanel/ManageServicesModule').then(m => ({ default: m.ManageServicesModule })));
 const ManageBannersModule = lazy(() => import('./components/AdminPanel/ManageBannersModule').then(m => ({ default: m.ManageBannersModule })));
 const ManageTicketsModule = lazy(() => import('./components/AdminPanel/ManageTicketsModule').then(m => ({ default: m.ManageTicketsModule })));
 const FreelancerCRMModule = lazy(() => import('./components/AdminPanel/FreelancerCRMModule').then(m => ({ default: m.FreelancerCRMModule })));
+const ManageDiscountsModule = lazy(() => import('./components/AdminPanel/ManageDiscountsModule').then(m => ({ default: m.ManageDiscountsModule })));
 const SiteSettingsModule = lazy(() => import('./components/AdminPanel/SiteSettingsModule').then(m => ({ default: m.SiteSettingsModule })));
 const PaymentSettingsModule = lazy(() => import('./components/AdminPanel/PaymentSettingsModule').then(m => ({ default: m.PaymentSettingsModule })));
 const PaymentReceiptsModule = lazy(() => import('./components/AdminPanel/PaymentReceiptsModule').then(m => ({ default: m.PaymentReceiptsModule })));
@@ -61,6 +63,7 @@ export default function App() {
   // Auth State
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [userRole, setUserRole] = useState<'admin' | 'customer' | null>(null);
+  const [currentUser, setCurrentUser] = useState<{ id?: string; name?: string; email?: string; role?: string } | null>(null);
   const [isAuthChecking, setIsAuthChecking] = useState<boolean>(true);
   const [authMode, setAuthMode] = useState<'login' | 'signup'>('login');
 
@@ -98,6 +101,7 @@ export default function App() {
     const handleUnauthorized = () => {
       setIsAuthenticated(false);
       setUserRole(null);
+      setCurrentUser(null);
       setActiveTab('admin');
     };
 
@@ -161,20 +165,24 @@ export default function App() {
         if (data.authenticated) {
           setIsAuthenticated(true);
           setUserRole(data.role);
+          setCurrentUser(data.user || null);
           if (data.role === 'admin') {
             await fetchAdminData();
           }
         } else {
           setIsAuthenticated(false);
           setUserRole(null);
+          setCurrentUser(null);
         }
       } else {
         setIsAuthenticated(false);
         setUserRole(null);
+        setCurrentUser(null);
       }
     } catch {
       setIsAuthenticated(false);
       setUserRole(null);
+      setCurrentUser(null);
     } finally {
       setIsAuthChecking(false);
     }
@@ -186,10 +194,10 @@ export default function App() {
   }, [fetchPublicData, checkSession]);
 
   useEffect(() => {
-    if (activeTab === 'admin' && isAuthenticated) {
+    if (activeTab === 'admin' && isAuthenticated && userRole === 'admin') {
       fetchAdminData();
     }
-  }, [activeTab, isAuthenticated, fetchAdminData]);
+  }, [activeTab, isAuthenticated, userRole, fetchAdminData]);
 
   const scrollToSection = (id: string) => {
     setActiveTab('landing');
@@ -209,6 +217,7 @@ export default function App() {
     }
     setIsAuthenticated(false);
     setUserRole(null);
+    setCurrentUser(null);
     setActiveTab('landing');
   };
 
@@ -341,6 +350,10 @@ export default function App() {
           setAuthMode(mode);
           setActiveTab('admin');
         }}
+        isAuthenticated={isAuthenticated}
+        userRole={userRole}
+        currentUser={currentUser}
+        onLogout={handleLogout}
       />
 
       {/* VIEW 1: MAIN LANDING PAGE */}
@@ -445,6 +458,7 @@ export default function App() {
                 onLoginSuccess={async (role) => {
                   setIsAuthenticated(true);
                   setUserRole(role);
+                  await checkSession();
                   if (role === 'admin') {
                     await fetchAdminData();
                   }
@@ -475,6 +489,10 @@ export default function App() {
                       requests={appRequests}
                       lang={lang}
                     />
+                  )}
+
+                  {activeAdminTab === 'users' && (
+                    <ManageUsersModule lang={lang} />
                   )}
 
                   {activeAdminTab === 'agents' && (
@@ -517,6 +535,10 @@ export default function App() {
                       onOpenProposalModal={(freelancer) => setProposalFreelancer(freelancer)}
                       lang={lang}
                     />
+                  )}
+
+                  {activeAdminTab === 'discounts' && (
+                    <ManageDiscountsModule />
                   )}
 
                   {activeAdminTab === 'settings' && (

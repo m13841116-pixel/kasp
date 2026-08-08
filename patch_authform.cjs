@@ -1,4 +1,7 @@
-import React, { useState } from 'react';
+const fs = require('fs');
+let content = fs.readFileSync('src/components/AuthForm.tsx', 'utf8');
+
+const newAuthForm = `import React, { useState } from 'react';
 import { Mail, KeyRound, Loader2, LogIn, AlertCircle, Sparkles } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { apiFetch } from '../utils/api';
@@ -154,3 +157,6 @@ export const AuthForm: React.FC<AuthFormProps> = ({ onLoginSuccess }) => {
     </div>
   );
 };
+`;
+
+fs.writeFileSync('src/components/AuthForm.tsx', newAuthForm);

@@ -4,17 +4,19 @@ import {
   Bot, 
   Image as ImageIcon, 
   Users, 
+  UserCheck,
   ArrowLeft,
   LogOut,
   Wrench,
   LifeBuoy,
   Settings,
   CreditCard,
-  FileCheck
+  FileCheck,
+  Tag
 } from 'lucide-react';
 import { KaspLogo } from '../KaspLogo';
 
-export type AdminTab = 'dashboard' | 'agents' | 'services' | 'banners' | 'tickets' | 'crm' | 'settings' | 'payments' | 'receipts';
+export type AdminTab = 'dashboard' | 'users' | 'agents' | 'services' | 'banners' | 'tickets' | 'crm' | 'discounts' | 'payments' | 'receipts' | 'settings';
 
 interface SidebarProps {
   activeAdminTab: AdminTab;
@@ -35,6 +37,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
       id: 'dashboard',
       label: 'داشبورد مدیریت',
       icon: <LayoutDashboard className="w-4 h-4" />
+    },
+    {
+      id: 'users',
+      label: 'کاربران ثبت‌نامی',
+      icon: <UserCheck className="w-4 h-4" />
     },
     {
       id: 'agents',
@@ -60,6 +67,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
       id: 'crm',
       label: 'سفارشات پروژه CRM',
       icon: <Users className="w-4 h-4" />
+    },
+    {
+      id: 'discounts',
+      label: 'کدهای تخفیف',
+      icon: <Tag className="w-4 h-4" />
     },
     {
       id: 'payments',
