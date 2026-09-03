@@ -16,9 +16,8 @@ async function startServer() {
   await initDb();
   const app = express();
   
-  // NOTE: In AI Studio, the PORT MUST remain 3000. 
-  // However, we allow process.env.PORT as a fallback for cPanel/standard deployments.
-  const PORT = Number(process.env.PORT) || 3000;
+  // NOTE: In AI Studio, the PORT MUST remain 3000.
+  const PORT = 3000;
 
   // Enable trust proxy for reverse proxies in Cloud Run / container ingress
   app.set('trust proxy', 1);
@@ -29,11 +28,11 @@ async function startServer() {
     contentSecurityPolicy: {
       directives: {
         defaultSrc: ["'self'"],
-        scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"], // Needed for Vite dev and React
-        styleSrc: ["'self'", "'unsafe-inline'"], // Needed for Tailwind/React
+        scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://cdn.tailwindcss.com", "https://unpkg.com"],
+        styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https://cdn.jsdelivr.net", "https://v1.fontapi.ir", "https://fdn.fontcdn.ir"],
         imgSrc: ["'self'", "data:", "blob:", "https:"],
         connectSrc: ["'self'", "https:", "wss:", "ws:", process.env.CORS_ORIGINS ? process.env.CORS_ORIGINS.split(',').map(o => o.trim()).join(' ') : ''],
-        fontSrc: ["'self'", "data:", "https:"],
+        fontSrc: ["'self'", "data:", "https:", "https://fonts.gstatic.com", "https://cdn.jsdelivr.net", "https://v1.fontapi.ir", "https://fdn.fontcdn.ir"],
         frameAncestors: ["*"], // Allow embedding in AI Studio preview iframe
       },
     },
@@ -48,7 +47,8 @@ async function startServer() {
         allowedOrigins.length === 0 ||
         allowedOrigins.includes(origin) ||
         allowedOrigins.includes('*') ||
-        origin.endsWith('.run.app') ||
+        origin.includes('.run.app') ||
+        origin.includes('ai.studio') ||
         origin.includes('localhost') ||
         origin.includes('127.0.0.1')
       ) {
