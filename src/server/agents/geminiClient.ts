@@ -36,9 +36,10 @@ export function getGenAI(): GoogleGenAI | null {
 }
 
 // Supported models in order of priority:
-// 1. gemini-3.1-flash-lite: High throughput, fast latency (~1.5s), large free quota
-// 2. gemini-3.8-flash: High reasoning capability fallback
-const CANDIDATE_MODELS = ['gemini-3.1-flash-lite', 'gemini-3.8-flash'];
+// 1. gemini-2.5-flash: Standard fast, highly available model
+// 2. gemini-3.1-flash-lite: High throughput, low latency
+// 3. gemini-3.8-flash: High reasoning capability fallback
+const CANDIDATE_MODELS = ['gemini-2.5-flash', 'gemini-3.1-flash-lite', 'gemini-3.8-flash'];
 const HARD_TIMEOUT_MS = 30000; // Hard 30 seconds timeout per model request
 
 export function cleanJsonString(rawText: string): string {

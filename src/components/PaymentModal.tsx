@@ -41,15 +41,16 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
       });
       const data = await res.json();
       if (res.ok && data.paymentUrl) {
+        // Direct redirect to Shaparak / Zibal gateway
         window.location.href = data.paymentUrl;
       } else {
-        // Friendly, sanitized message without sensitive raw errors
-        setGatewayError('در حال حاضر اتصال به درگاه پرداخت با مشکل مواجه شده است. لطفاً چند دقیقه دیگر دوباره تلاش کنید.');
+        const errorText = data.error || data.message || 'خطا در برقراری ارتباط با درگاه پرداخت زیبال.';
+        const codeSuffix = data.code ? ` (کد خطا: ${data.code})` : '';
+        setGatewayError(`${errorText}${codeSuffix}`);
         setIsRedirectingToZibal(false);
       }
     } catch (err: any) {
-      // Non-sensitive error message
-      setGatewayError('در حال حاضر اتصال به درگاه پرداخت با مشکل مواجه شده است. لطفاً چند دقیقه دیگر دوباره تلاش کنید.');
+      setGatewayError(err.message || 'خطا در ارتباط با سرور پرداخت. لطفاً وضعیت اینترنت خود را بررسی و دوباره تلاش کنید.');
       setIsRedirectingToZibal(false);
     }
   };
