@@ -3,9 +3,9 @@ import { CreditCard, Save, CheckCircle2, ShieldAlert, Server, HandCoins } from '
 import { apiFetch } from '../../utils/api';
 
 export const PaymentSettingsModule: React.FC = () => {
-  const [onlineEnabled, setOnlineEnabled] = useState(false);
+  const [onlineEnabled, setOnlineEnabled] = useState(true);
   const [manualEnabled, setManualEnabled] = useState(true);
-  const [provider, setProvider] = useState('zarinpal');
+  const [provider, setProvider] = useState('zibal');
   const [mode, setMode] = useState('sandbox');
   const [apiKey, setApiKey] = useState('');
   
@@ -14,6 +14,7 @@ export const PaymentSettingsModule: React.FC = () => {
   const [accountName, setAccountName] = useState('');
   const [iban, setIban] = useState('');
 
+  const [zibalConfig, setZibalConfig] = useState<any>(null);
   const [saved, setSaved] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -23,13 +24,16 @@ export const PaymentSettingsModule: React.FC = () => {
       .then(data => {
         if (data && !data.error) {
           setOnlineEnabled(data.isOnlineGatewayActive || false);
-          setProvider(data.provider || 'zarinpal');
+          setProvider(data.provider || 'zibal');
           setMode(data.mode || 'sandbox');
           setApiKey(data.apiKey || '');
           setBankName(data.bankName || 'بانک سامان');
           setCardNumber(data.cardNumber || '');
           setAccountName(data.accountHolder || '');
           setIban(data.iban || '');
+          if (data.zibal) {
+            setZibalConfig(data.zibal);
+          }
         }
         setLoading(false);
       })
@@ -102,16 +106,13 @@ export const PaymentSettingsModule: React.FC = () => {
 
           <div className={`space-y-5 transition-opacity ${!onlineEnabled ? 'opacity-50 pointer-events-none' : ''}`}>
             <div>
-              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-2">ارائه‌دهنده درگاه پرداخت</label>
+              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-2">درگاه پرداخت آنلاین شاپرک</label>
               <select 
                 value={provider}
                 onChange={e => setProvider(e.target.value)}
                 className="w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white text-sm focus:outline-none focus:border-purple-500"
               >
-                <option value="zarinpal">زرین‌پال (ZarinPal)</option>
-                <option value="zibal">زیبال (Zibal)</option>
-                <option value="nextpay">نکست‌پی (NextPay)</option>
-                <option value="idpay">آیدی‌پی (IDPay)</option>
+                <option value="zibal">درگاه پرداخت زیبال (Zibal - رسمی شاپرک)</option>
               </select>
             </div>
 
@@ -143,6 +144,44 @@ export const PaymentSettingsModule: React.FC = () => {
                 className="w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white font-mono text-sm focus:outline-none focus:border-purple-500 dir-ltr text-left"
               />
             </div>
+
+            {/* Zibal & Fixed IP Relay Status Card */}
+            {zibalConfig && (
+              <div className="p-4 bg-slate-50 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-700/80 rounded-xl space-y-2.5 text-xs">
+                <div className="flex items-center justify-between font-bold text-slate-800 dark:text-slate-200 border-b border-slate-200 dark:border-slate-800 pb-2">
+                  <span>وضعیت اتصال و درگاه واسط ثابت IP:</span>
+                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                    zibalConfig.hasFixedIpProxy 
+                      ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20' 
+                      : 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20'
+                  }`}>
+                    {zibalConfig.hasFixedIpProxy ? 'واسط IP ثابت فعال' : 'اتصال مستقیم زیبال'}
+                  </span>
+                </div>
+                
+                <div className="space-y-1 text-slate-600 dark:text-slate-400">
+                  <div className="flex justify-between">
+                    <span>مرچنت سرور:</span>
+                    <span className="font-mono text-slate-800 dark:text-slate-200 font-bold">{zibalConfig.merchantMasked}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>آدرس واسط ثابت IP (Proxy):</span>
+                    <span className="font-mono text-slate-800 dark:text-slate-200 dir-ltr text-left">
+                      {zibalConfig.proxyUrl || 'تعریف نشده (Direct)'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>آدرس کالبک رسمی:</span>
+                    <span className="font-mono text-slate-800 dark:text-slate-200 dir-ltr text-left">
+                      /api/payment/zibal/callback
+                    </span>
+                  </div>
+                  <div className="pt-1 text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
+                    💡 کالبک فیک و آزمایشی کاملاً حذف شده و اعتبارسنجی منحصراً از طریق استعلام لحظه‌ای سرور به درگاه شاپرک زیبال صورت می‌پذیرد.
+                  </div>
+                </div>
+              </div>
+            )}
             
             <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl flex items-start gap-3">
               <ShieldAlert className="w-5 h-5 text-amber-500 dark:text-amber-400 shrink-0 mt-0.5" />

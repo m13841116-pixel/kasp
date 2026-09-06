@@ -1,5 +1,5 @@
 import React from 'react';
-import { LayoutDashboard, Code, ArrowLeft, User, LogOut } from 'lucide-react';
+import { LayoutDashboard, Code, ArrowLeft, User, LogOut, Bot, Sparkles } from 'lucide-react';
 import { KaspLogo } from './KaspLogo';
 
 interface NavbarProps {
@@ -51,24 +51,24 @@ export const Navbar: React.FC<NavbarProps> = ({
               صفحه اصلی
             </button>
             <button
-              onClick={() => onScrollToSection('agents')}
-              className="px-4 py-2 text-xs font-bold rounded-xl text-slate-700 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-800 hover:text-indigo-600 dark:hover:text-indigo-400 hover:shadow-sm border border-transparent transition-all flex items-center gap-1.5"
+              onClick={() => onScrollToSection('ai-team-workforce')}
+              className="px-3.5 py-2 text-xs font-black rounded-xl bg-gradient-to-r from-indigo-500/10 via-purple-500/10 to-emerald-500/10 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-500/20 border border-indigo-500/30 transition-all flex items-center gap-1.5 shadow-sm"
             >
-              <LayoutDashboard className="w-3.5 h-3.5 text-indigo-500" />
-              راهکارها & نمونه‌کارها
+              <Bot className="w-3.5 h-3.5 text-indigo-500" />
+              <span>تیم هوش مصنوعی</span>
+              <span className="px-1.5 py-0.5 rounded-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white text-[9px] font-bold">جدید</span>
             </button>
             <button
-              onClick={() => onScrollToSection('pricing')}
+              onClick={() => onScrollToSection('how-it-works')}
               className="px-4 py-2 text-xs font-bold rounded-xl text-slate-700 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-800 hover:text-indigo-600 dark:hover:text-indigo-400 hover:shadow-sm border border-transparent transition-all"
             >
-              پلن‌ها & تعرفه‌ها
+              چطور کار می‌کند؟
             </button>
             <button
-              onClick={() => onScrollToSection('custom-app')}
-              className="px-4 py-2 text-xs font-bold rounded-xl text-slate-700 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-800 hover:text-indigo-600 dark:hover:text-indigo-400 hover:shadow-sm border border-transparent transition-all flex items-center gap-1.5"
+              onClick={() => onScrollToSection('samples')}
+              className="px-4 py-2 text-xs font-bold rounded-xl text-slate-700 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-800 hover:text-indigo-600 dark:hover:text-indigo-400 hover:shadow-sm border border-transparent transition-all"
             >
-              <Code className="w-3.5 h-3.5 text-indigo-500" />
-              توسعه سفارشی
+              نمونه نتایج
             </button>
           </nav>
         )}

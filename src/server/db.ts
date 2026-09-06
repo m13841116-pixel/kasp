@@ -68,6 +68,15 @@ export async function initDb() {
         try {
           await pool.query("ALTER TABLE discount_codes ADD COLUMN IF NOT EXISTS assignedUserId TEXT;");
           await pool.query("ALTER TABLE discount_codes ADD COLUMN IF NOT EXISTS expiresAt TEXT;");
+          await pool.query("ALTER TABLE ai_team_projects ADD COLUMN IF NOT EXISTS isPublic INTEGER DEFAULT 0;");
+          await pool.query("ALTER TABLE payment_receipts ADD COLUMN IF NOT EXISTS orderId TEXT;");
+          await pool.query("ALTER TABLE payment_receipts ADD COLUMN IF NOT EXISTS productType TEXT;");
+          await pool.query("ALTER TABLE payment_receipts ADD COLUMN IF NOT EXISTS productCode TEXT;");
+          await pool.query("ALTER TABLE ai_orders ADD COLUMN IF NOT EXISTS trackId TEXT;");
+          await pool.query("ALTER TABLE ai_orders ADD COLUMN IF NOT EXISTS refNumber TEXT;");
+          await pool.query("ALTER TABLE ai_orders ADD COLUMN IF NOT EXISTS gateway TEXT;");
+          await pool.query("ALTER TABLE ai_orders ADD COLUMN IF NOT EXISTS cardNumber TEXT;");
+          await pool.query("ALTER TABLE ai_orders ADD COLUMN IF NOT EXISTS errorMessage TEXT;");
         } catch (e) {}
       }
       return pool;
@@ -119,9 +128,9 @@ export async function initDb() {
     
     const adminPass = process.env.ADMIN_PASSWORD || 'admin123';
     const hashed = bcrypt.hashSync(adminPass, 10);
-    const existingAdmin = sqliteDb.exec("SELECT * FROM users WHERE role = 'admin'");
-    if (existingAdmin.length > 0) {
-      sqliteDb.run("UPDATE users SET email = 'admin@kasp.ir', password = ? WHERE role = 'admin'", [hashed]);
+    const existingAdmin = sqliteDb.exec("SELECT * FROM users WHERE email = 'admin@kasp.ir'");
+    if (existingAdmin.length > 0 && existingAdmin[0].values.length > 0) {
+      sqliteDb.run("UPDATE users SET password = ? WHERE email = 'admin@kasp.ir'", [hashed]);
     } else {
       sqliteDb.run("INSERT INTO users (id, name, email, password, role) VALUES (?, ?, ?, ?, ?)", ["admin-1", "مدیر سیستم", "admin@kasp.ir", hashed, "admin"]);
     }
@@ -134,6 +143,33 @@ export async function initDb() {
     } catch (e) {}
     try {
       sqliteDb.run("ALTER TABLE discount_codes ADD COLUMN expiresAt TEXT");
+    } catch (e) {}
+    try {
+      sqliteDb.run("ALTER TABLE ai_team_projects ADD COLUMN isPublic INTEGER DEFAULT 0");
+    } catch (e) {}
+    try {
+      sqliteDb.run("ALTER TABLE payment_receipts ADD COLUMN orderId TEXT");
+    } catch (e) {}
+    try {
+      sqliteDb.run("ALTER TABLE payment_receipts ADD COLUMN productType TEXT");
+    } catch (e) {}
+    try {
+      sqliteDb.run("ALTER TABLE payment_receipts ADD COLUMN productCode TEXT");
+    } catch (e) {}
+    try {
+      sqliteDb.run("ALTER TABLE ai_orders ADD COLUMN trackId TEXT");
+    } catch (e) {}
+    try {
+      sqliteDb.run("ALTER TABLE ai_orders ADD COLUMN refNumber TEXT");
+    } catch (e) {}
+    try {
+      sqliteDb.run("ALTER TABLE ai_orders ADD COLUMN gateway TEXT");
+    } catch (e) {}
+    try {
+      sqliteDb.run("ALTER TABLE ai_orders ADD COLUMN cardNumber TEXT");
+    } catch (e) {}
+    try {
+      sqliteDb.run("ALTER TABLE ai_orders ADD COLUMN errorMessage TEXT");
     } catch (e) {}
 
         const defaultPrizesJson = JSON.stringify([
@@ -292,6 +328,40 @@ async function createTablesPg() {
       maxSpins INTEGER DEFAULT 3,
       prizesConfig TEXT
     );
+    CREATE TABLE IF NOT EXISTS ai_team_projects (
+      id TEXT PRIMARY KEY,
+      userId TEXT,
+      businessGoal TEXT,
+      reportData TEXT,
+      isPublic INTEGER DEFAULT 0,
+      createdAt TEXT
+    );
+    CREATE TABLE IF NOT EXISTS ai_entitlements (
+      id TEXT PRIMARY KEY,
+      userId TEXT,
+      productCode TEXT,
+      creditsTotal INTEGER DEFAULT 0,
+      creditsRemaining INTEGER DEFAULT 0,
+      status TEXT DEFAULT 'active',
+      createdAt TEXT,
+      expiresAt TEXT
+    );
+    CREATE TABLE IF NOT EXISTS ai_orders (
+      id TEXT PRIMARY KEY,
+      userId TEXT,
+      productCode TEXT,
+      amount REAL,
+      status TEXT DEFAULT 'PENDING',
+      credits INTEGER DEFAULT 1,
+      createdAt TEXT,
+      paidAt TEXT,
+      receiptId TEXT,
+      trackId TEXT,
+      refNumber TEXT,
+      gateway TEXT,
+      cardNumber TEXT,
+      errorMessage TEXT
+    );
   `);
 }
 
@@ -306,10 +376,13 @@ function createTablesSqlite() {
     CREATE TABLE IF NOT EXISTS freelancers (id TEXT PRIMARY KEY, name TEXT, specialty TEXT, status TEXT, rate REAL, rateNum INTEGER, experience INTEGER, rating REAL, completedProjects INTEGER, avatar TEXT, email TEXT, phone TEXT);
     CREATE TABLE IF NOT EXISTS app_requests (id TEXT PRIMARY KEY, userName TEXT, contactInfo TEXT, idea TEXT, budget REAL, status TEXT, aiAnalysis TEXT);
     CREATE TABLE IF NOT EXISTS payment_settings (id INTEGER PRIMARY KEY AUTOINCREMENT, bankName TEXT, cardNumber TEXT, accountHolder TEXT, iban TEXT, isOnlineGatewayActive INTEGER, provider TEXT, mode TEXT, apiKey TEXT);
-    CREATE TABLE IF NOT EXISTS payment_receipts (id TEXT PRIMARY KEY, userId TEXT, customerName TEXT, trackingCode TEXT, senderName TEXT, amount TEXT, receiptImage TEXT, note TEXT, status TEXT);
+    CREATE TABLE IF NOT EXISTS payment_receipts (id TEXT PRIMARY KEY, userId TEXT, customerName TEXT, trackingCode TEXT, senderName TEXT, amount TEXT, receiptImage TEXT, note TEXT, status TEXT, orderId TEXT, productType TEXT, productCode TEXT);
     CREATE TABLE IF NOT EXISTS banner_config (id INTEGER PRIMARY KEY AUTOINCREMENT, text TEXT, link TEXT, isActive INTEGER, color TEXT);
     CREATE TABLE IF NOT EXISTS discount_codes (code TEXT PRIMARY KEY, prize TEXT, discountPercent INTEGER, isUsed INTEGER DEFAULT 0, usedBy TEXT, assignedUserId TEXT, expiresAt TEXT, createdAt TEXT);
     CREATE TABLE IF NOT EXISTS wheel_settings (id INTEGER PRIMARY KEY DEFAULT 1, maxSpins INTEGER DEFAULT 3);
+    CREATE TABLE IF NOT EXISTS ai_team_projects (id TEXT PRIMARY KEY, userId TEXT, businessGoal TEXT, reportData TEXT, isPublic INTEGER DEFAULT 0, createdAt TEXT);
+    CREATE TABLE IF NOT EXISTS ai_entitlements (id TEXT PRIMARY KEY, userId TEXT, productCode TEXT, creditsTotal INTEGER DEFAULT 0, creditsRemaining INTEGER DEFAULT 0, status TEXT DEFAULT 'active', createdAt TEXT, expiresAt TEXT);
+    CREATE TABLE IF NOT EXISTS ai_orders (id TEXT PRIMARY KEY, userId TEXT, productCode TEXT, amount REAL, status TEXT DEFAULT 'PENDING', credits INTEGER DEFAULT 1, createdAt TEXT, paidAt TEXT, receiptId TEXT, trackId TEXT, refNumber TEXT, gateway TEXT, cardNumber TEXT, errorMessage TEXT);
   `);
 }
 
@@ -358,7 +431,16 @@ const keyMap: Record<string, string> = {
   createdat: 'createdAt',
   maxspins: 'maxSpins',
   prizesconfig: 'prizesConfig',
-  apikey: 'apiKey'
+  apikey: 'apiKey',
+  ispublic: 'isPublic',
+  productcode: 'productCode',
+  creditstotal: 'creditsTotal',
+  creditsremaining: 'creditsRemaining',
+  expiresat: 'expiresAt',
+  paidat: 'paidAt',
+  receiptid: 'receiptId',
+  orderid: 'orderId',
+  producttype: 'productType'
 };
 
 function mapKeys(row: any) {

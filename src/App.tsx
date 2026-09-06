@@ -7,6 +7,7 @@ import { PricingSection } from './components/PricingSection';
 import { AgentsCarousel } from './components/AgentsCarousel';
 import { ProcessSection } from './components/ProcessSection';
 import { CustomAppSection } from './components/CustomAppSection';
+import { AITeamSection } from './components/AIBusinessTeam/AITeamSection';
 import { LuckyWheel } from './components/LuckyWheel';
 import { FaqSection } from './components/FaqSection';
 import { TicketModal } from './components/TicketModal';
@@ -93,12 +94,50 @@ export default function App() {
   const [bannerConfig, setBannerConfig] = useState<BannerConfig>(initialBannerConfig);
   const [freelancers, setFreelancers] = useState<Freelancer[]>(initialFreelancers);
   const [appRequests, setAppRequests] = useState<AppRequest[]>(initialAppRequests);
+  const [aiTeamGoal, setAiTeamGoal] = useState<string>('');
+  const [viewReportData, setViewReportData] = useState<any>(null);
 
   // Modal States
   const [proposalFreelancer, setProposalFreelancer] = useState<Freelancer | null>(null);
   const [previewAgent, setPreviewAgent] = useState<AIAgent | null>(null);
   const [isTicketModalOpen, setIsTicketModalOpen] = useState(false);
   const [paymentModalTarget, setPaymentModalTarget] = useState<{ title: string; price: string } | null>(null);
+  const [paymentNotification, setPaymentNotification] = useState<{ type: 'success' | 'error' | 'cancelled'; message: string; refNumber?: string } | null>(null);
+
+  // Handle Return from Zibal Payment Gateway
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const paymentStatus = params.get('paymentStatus');
+    if (paymentStatus) {
+      const refNumber = params.get('refNumber') || undefined;
+      const message = params.get('message') || params.get('reason') || '';
+      
+      if (paymentStatus === 'success') {
+        setPaymentNotification({
+          type: 'success',
+          message: 'پرداخت آنلاین از طریق درگاه زیبال با موفقیت انجام شد و ۱ اعتبار تحلیل اختصاصی به حساب شما افزوده گردید.',
+          refNumber
+        });
+        setTimeout(() => {
+          const workforceEl = document.getElementById('ai-team-workforce');
+          workforceEl?.scrollIntoView({ behavior: 'smooth' });
+        }, 600);
+      } else if (paymentStatus === 'cancelled') {
+        setPaymentNotification({
+          type: 'cancelled',
+          message: 'عملیات پرداخت توسط شما در درگاه زیبال لغو شد.'
+        });
+      } else if (paymentStatus === 'failed' || paymentStatus === 'error') {
+        setPaymentNotification({
+          type: 'error',
+          message: message || 'تراکنش پرداخت آنلاین با خطا مواجه شد یا از سوی درگاه زیبال تأیید نگردید.'
+        });
+      }
+      
+      const newUrl = window.location.pathname + (window.location.hash || '');
+      window.history.replaceState({}, document.title, newUrl);
+    }
+  }, []);
 
   // Support hash routing (#admin)
   useEffect(() => {
@@ -376,6 +415,39 @@ export default function App() {
         onLogout={handleLogout}
       />
 
+      {/* Payment Gateway Feedback Banner */}
+      {paymentNotification && (
+        <div className="max-w-4xl mx-auto px-4 mt-6 animate-fadeIn">
+          <div className={`p-4 rounded-2xl border flex items-start justify-between gap-4 shadow-lg ${
+            paymentNotification.type === 'success'
+              ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-900 dark:text-emerald-100'
+              : paymentNotification.type === 'cancelled'
+              ? 'bg-amber-500/10 border-amber-500/30 text-amber-900 dark:text-amber-100'
+              : 'bg-rose-500/10 border-rose-500/30 text-rose-900 dark:text-rose-100'
+          }`}>
+            <div className="space-y-1 text-sm">
+              <div className="font-black flex items-center gap-2">
+                {paymentNotification.type === 'success' && <span>تراکنش موفق در درگاه زیبال</span>}
+                {paymentNotification.type === 'cancelled' && <span>لغو تراکنش بانکی</span>}
+                {paymentNotification.type === 'error' && <span>خطا در انجام پرداخت</span>}
+              </div>
+              <p className="text-xs opacity-90 leading-relaxed">{paymentNotification.message}</p>
+              {paymentNotification.refNumber && (
+                <div className="text-xs font-mono font-bold bg-white/40 dark:bg-black/20 px-2.5 py-1 rounded-lg inline-block mt-1">
+                  شماره پیگیری زیبال: {paymentNotification.refNumber}
+                </div>
+              )}
+            </div>
+            <button
+              onClick={() => setPaymentNotification(null)}
+              className="px-3 py-1 text-xs rounded-lg hover:bg-black/5 dark:hover:bg-white/10 font-bold transition-colors"
+            >
+              بستن
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* VIEW 1: MAIN LANDING PAGE */}
       {activeTab === 'landing' && (
         <div className="w-full max-w-7xl mx-auto animate-fadeIn relative">
@@ -387,34 +459,53 @@ export default function App() {
               bannerConfig={bannerConfig}
               onExploreAgents={() => scrollToSection('agents')}
               onRequestCustomApp={() => scrollToSection('custom-app')}
+              onStartAITeam={(goal) => {
+                if (goal) setAiTeamGoal(goal);
+                scrollToSection('ai-team-workforce');
+              }}
+              lang={lang}
+            />
+
+            {/* KASP AI Workforce / AI Business Team (Manager + Research + Marketing) */}
+            <AITeamSection
+              initialGoal={aiTeamGoal}
+              initialReport={viewReportData}
+              onRequestCustomApp={(details) => {
+                scrollToSection('custom-app');
+              }}
+              onRequireLogin={() => {
+                setAuthMode('login');
+                setActiveTab('admin');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
               lang={lang}
             />
 
             {/* Promotional Banners Slider */}
-            <BannersCarousel banners={promoBanners} onRequestCustomApp={() => scrollToSection('custom-app')} />
+            {/* <BannersCarousel banners={promoBanners} onRequestCustomApp={() => scrollToSection('custom-app')} /> */}
 
             {/* AI Agents Showcase Carousel - Placed right before Services */}
-            <AgentsCarousel
+            {/* <AgentsCarousel
               agents={agents.filter(a => a.status === 'Active')}
               onTryAgent={(agent) => setPreviewAgent(agent)}
               onOpenPayment={(title, price) => setPaymentModalTarget({ title, price })}
               lang={lang}
-            />
+            /> */}
 
             {/* Services & Core Capabilities */}
-            <ServicesSection services={services} onRequestCustomApp={() => scrollToSection('custom-app')} />
+            {/* <ServicesSection services={services} onRequestCustomApp={() => scrollToSection('custom-app')} /> */}
 
             {/* Pricing Section */}
-            <PricingSection />
+            {/* <PricingSection /> */}
 
             {/* 4-Step Development Process */}
-            <ProcessSection />
+            {/* <ProcessSection /> */}
 
             {/* Custom Project Order */}
-            <CustomAppSection
+            {/* <CustomAppSection
               onSubmitRequest={handleCustomAppSubmit}
               lang={lang}
-            />
+            /> */}
 
             {/* FAQ Accordion Section */}
             <FaqSection />
@@ -449,7 +540,7 @@ export default function App() {
               />
             ) : userRole === 'customer' ? (
               /* Customer Workspace Dashboard */
-              <CustomerDashboard onLogout={handleLogout} />
+              <CustomerDashboard onLogout={handleLogout} onViewReport={(report) => { setViewReportData(report); setActiveTab('landing'); }} />
             ) : (
               /* Admin Workspace Dashboard */
               <div className="flex flex-col lg:flex-row gap-8">

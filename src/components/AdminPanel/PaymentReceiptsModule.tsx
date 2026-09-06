@@ -74,7 +74,14 @@ export const PaymentReceiptsModule: React.FC = () => {
               <tbody className="divide-y divide-slate-200 dark:divide-slate-700/50">
                 {receipts.map(receipt => (
                   <tr key={receipt.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                    <td className="px-4 py-4 font-bold text-slate-900 dark:text-white">{receipt.customerName || 'مهمان'}</td>
+                    <td className="px-4 py-4 font-bold text-slate-900 dark:text-white">
+                      <div>{receipt.customerName || 'مهمان'}</div>
+                      {receipt.productCode && (
+                        <span className="inline-block mt-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20">
+                          {receipt.productCode === 'kasp-business-report' ? 'سفارش گزارش هوش تجاری' : receipt.productCode}
+                        </span>
+                      )}
+                    </td>
                     <td className="px-4 py-4">
                       <div className="text-emerald-600 dark:text-emerald-400 font-mono">{receipt.trackingCode}</div>
                       {receipt.senderName && <div className="text-xs text-slate-500 mt-1">{receipt.senderName}</div>}

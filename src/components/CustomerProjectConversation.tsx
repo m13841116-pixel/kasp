@@ -8,37 +8,70 @@ import {
   Bot
 } from 'lucide-react';
 
-export const CustomerProjectConversation: React.FC = () => {
+export const CustomerProjectConversation: React.FC<{ report?: any }> = ({ report }) => {
+  const [isLoading, setIsLoading] = useState(false);
   const [messages, setMessages] = useState([
     {
       id: 1,
       sender: 'admin',
-      text: 'سلام! درخواست شما دریافت شد. ایده بسیار جذابی است. در حال بررسی نیازمندی‌های فنی آن هستیم.',
-      time: '۱۰:۳۲ - ۲ شهریور',
-      attachments: []
-    },
-    {
-      id: 2,
-      sender: 'customer',
-      text: 'سلام، ممنون. آیا امکان اتصال به درگاه زرین‌پال هم در این فاز وجود دارد؟',
-      time: '۱۱:۱۵ - ۲ شهریور',
+      text: 'گزارش ۱۴ بخشی هوش تجاری KASP آماده شد. اکنون اگر درباره فازهای اجرا، رقبا، یا جزئیات برنامه اقدام سوالی دارید، بپرسید.',
+      time: 'همین الان',
       attachments: []
     }
   ]);
   const [newMessage, setNewMessage] = useState('');
 
-  const handleSendMessage = (e: React.FormEvent) => {
+    const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newMessage.trim()) return;
+    if (!newMessage.trim() || isLoading) return;
     
-    setMessages([...messages, {
+    const userText = newMessage.trim();
+    const newMsg = {
       id: Date.now(),
       sender: 'customer',
-      text: newMessage,
+      text: userText,
       time: 'همین الان',
       attachments: []
-    }]);
+    };
+    
+    setMessages(prev => [...prev, newMsg]);
     setNewMessage('');
+    setIsLoading(true);
+
+    try {
+      const res = await fetch('/api/ai-team/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: userText,
+          report: report,
+          history: messages.map(m => ({ role: m.sender === 'admin' ? 'assistant' : 'user', content: m.text }))
+        })
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setMessages(prev => [...prev, {
+          id: Date.now() + 1,
+          sender: 'admin',
+          text: data.reply || 'مشکلی پیش آمد.',
+          time: 'همین الان',
+          attachments: []
+        }]);
+      } else {
+        throw new Error('Server error');
+      }
+    } catch (e) {
+      setMessages(prev => [...prev, {
+        id: Date.now() + 1,
+        sender: 'admin',
+        text: 'خطا در برقراری ارتباط با سرور. لطفاً دوباره تلاش کنید.',
+        time: 'همین الان',
+        attachments: []
+      }]);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -51,7 +84,7 @@ export const CustomerProjectConversation: React.FC = () => {
             <Bot className="w-5 h-5" />
           </div>
           <div>
-            <h3 className="text-sm font-bold text-slate-900 dark:text-white">تیم فنی KASP</h3>
+            <h3 className="text-sm font-bold text-slate-900 dark:text-white">مدیر هوش مصنوعی KASP</h3>
             <p className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1 mt-0.5">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 dark:bg-emerald-400 animate-pulse" />
               پاسخگویی سریع
