@@ -339,6 +339,101 @@ async function createTablesPg() {
       cardNumber TEXT,
       errorMessage TEXT
     );
+    CREATE TABLE IF NOT EXISTS ai_business_states (
+      id TEXT PRIMARY KEY,
+      projectId TEXT,
+      userId TEXT,
+      currentStage TEXT,
+      completedStages TEXT,
+      graphData TEXT,
+      executiveMemory TEXT,
+      version INTEGER DEFAULT 1,
+      createdAt TEXT,
+      updatedAt TEXT
+    );
+    CREATE TABLE IF NOT EXISTS ai_build_artifacts (
+      id TEXT PRIMARY KEY,
+      projectId TEXT,
+      category TEXT,
+      title TEXT,
+      description TEXT,
+      status TEXT,
+      progress TEXT,
+      hierarchyLevel TEXT,
+      requiredInputs TEXT,
+      requiredServices TEXT,
+      humanApproval TEXT,
+      outputData TEXT,
+      isLive INTEGER DEFAULT 0,
+      canDeploy INTEGER DEFAULT 1,
+      executionLogs TEXT,
+      createdAt TEXT,
+      updatedAt TEXT
+    );
+    CREATE TABLE IF NOT EXISTS ai_build_logs (
+      id TEXT PRIMARY KEY,
+      projectId TEXT,
+      artifactId TEXT,
+      artifactTitle TEXT,
+      action TEXT,
+      statusFrom TEXT,
+      statusTo TEXT,
+      details TEXT,
+      timestamp TEXT
+    );
+    CREATE TABLE IF NOT EXISTS ai_voice_briefings (
+      id TEXT PRIMARY KEY,
+      projectId TEXT,
+      userId TEXT,
+      businessName TEXT,
+      briefingData TEXT,
+      audioData TEXT,
+      audioMimeType TEXT,
+      audioDurationSeconds REAL,
+      voiceName TEXT,
+      createdAt TEXT
+    );
+    CREATE TABLE IF NOT EXISTS ai_voice_interactions (
+      id TEXT PRIMARY KEY,
+      projectId TEXT,
+      userId TEXT,
+      userSpeechText TEXT,
+      advisorResponseText TEXT,
+      audioData TEXT,
+      audioMimeType TEXT,
+      timestamp TEXT
+    );
+    CREATE TABLE IF NOT EXISTS ai_approval_requests (
+      id TEXT PRIMARY KEY,
+      projectId TEXT,
+      userId TEXT,
+      actionKey TEXT,
+      title TEXT,
+      recommendationReason TEXT,
+      expectedResult TEXT,
+      riskAssessment TEXT,
+      estimatedCost TEXT,
+      status TEXT DEFAULT 'PENDING',
+      executionResult TEXT,
+      approvedAt TEXT,
+      executedAt TEXT,
+      createdAt TEXT
+    );
+    CREATE TABLE IF NOT EXISTS ai_execution_states (
+      projectId TEXT PRIMARY KEY,
+      userId TEXT,
+      goal TEXT,
+      currentState TEXT,
+      targetState TEXT,
+      planData TEXT,
+      taskQueue TEXT,
+      activeTaskId TEXT,
+      blockedTasks TEXT,
+      completedTasks TEXT,
+      metricsData TEXT,
+      learningData TEXT,
+      updatedAt TEXT
+    );
   `);
 }
 
@@ -359,6 +454,13 @@ function createTablesSqlite() {
     CREATE TABLE IF NOT EXISTS ai_team_projects (id TEXT PRIMARY KEY, userId TEXT, businessGoal TEXT, reportData TEXT, isPublic INTEGER DEFAULT 0, createdAt TEXT);
     CREATE TABLE IF NOT EXISTS ai_entitlements (id TEXT PRIMARY KEY, userId TEXT, productCode TEXT, creditsTotal INTEGER DEFAULT 0, creditsRemaining INTEGER DEFAULT 0, status TEXT DEFAULT 'active', createdAt TEXT, expiresAt TEXT);
     CREATE TABLE IF NOT EXISTS ai_orders (id TEXT PRIMARY KEY, userId TEXT, productCode TEXT, amount REAL, status TEXT DEFAULT 'PENDING', credits INTEGER DEFAULT 1, createdAt TEXT, paidAt TEXT, receiptId TEXT, trackId TEXT, refNumber TEXT, gateway TEXT, cardNumber TEXT, errorMessage TEXT);
+    CREATE TABLE IF NOT EXISTS ai_business_states (id TEXT PRIMARY KEY, projectId TEXT, userId TEXT, currentStage TEXT, completedStages TEXT, graphData TEXT, executiveMemory TEXT, version INTEGER DEFAULT 1, createdAt TEXT, updatedAt TEXT);
+    CREATE TABLE IF NOT EXISTS ai_build_artifacts (id TEXT PRIMARY KEY, projectId TEXT, category TEXT, title TEXT, description TEXT, status TEXT, progress TEXT, hierarchyLevel TEXT, requiredInputs TEXT, requiredServices TEXT, humanApproval TEXT, outputData TEXT, isLive INTEGER DEFAULT 0, canDeploy INTEGER DEFAULT 1, executionLogs TEXT, createdAt TEXT, updatedAt TEXT);
+    CREATE TABLE IF NOT EXISTS ai_build_logs (id TEXT PRIMARY KEY, projectId TEXT, artifactId TEXT, artifactTitle TEXT, action TEXT, statusFrom TEXT, statusTo TEXT, details TEXT, timestamp TEXT);
+    CREATE TABLE IF NOT EXISTS ai_voice_briefings (id TEXT PRIMARY KEY, projectId TEXT, userId TEXT, businessName TEXT, briefingData TEXT, audioData TEXT, audioMimeType TEXT, audioDurationSeconds REAL, voiceName TEXT, createdAt TEXT);
+    CREATE TABLE IF NOT EXISTS ai_voice_interactions (id TEXT PRIMARY KEY, projectId TEXT, userId TEXT, userSpeechText TEXT, advisorResponseText TEXT, audioData TEXT, audioMimeType TEXT, timestamp TEXT);
+    CREATE TABLE IF NOT EXISTS ai_approval_requests (id TEXT PRIMARY KEY, projectId TEXT, userId TEXT, actionKey TEXT, title TEXT, recommendationReason TEXT, expectedResult TEXT, riskAssessment TEXT, estimatedCost TEXT, status TEXT DEFAULT 'PENDING', executionResult TEXT, approvedAt TEXT, executedAt TEXT, createdAt TEXT);
+    CREATE TABLE IF NOT EXISTS ai_execution_states (projectId TEXT PRIMARY KEY, userId TEXT, goal TEXT, currentState TEXT, targetState TEXT, planData TEXT, taskQueue TEXT, activeTaskId TEXT, blockedTasks TEXT, completedTasks TEXT, metricsData TEXT, learningData TEXT, updatedAt TEXT);
   `);
 }
 
@@ -416,7 +518,17 @@ const keyMap: Record<string, string> = {
   paidat: 'paidAt',
   receiptid: 'receiptId',
   orderid: 'orderId',
-  producttype: 'productType'
+  producttype: 'productType',
+  trackid: 'trackId',
+  refnumber: 'refNumber',
+  errormessage: 'errorMessage',
+  assigneduserid: 'assignedUserId',
+  projectid: 'projectId',
+  currentstage: 'currentStage',
+  completedstages: 'completedStages',
+  graphdata: 'graphData',
+  executivememory: 'executiveMemory',
+  updatedat: 'updatedAt'
 };
 
 function mapKeys(row: any) {

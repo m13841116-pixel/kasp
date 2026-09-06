@@ -147,7 +147,9 @@ export function getZibalGatewayPublicUrl(): string {
 export function getZibalBaseUrl(): string {
   const customBase = process.env.ZIBAL_PROXY_URL || process.env.ZIBAL_FIXED_IP_URL || process.env.ZIBAL_API_BASE_URL;
   if (customBase?.trim()) {
-    return customBase.trim().replace(/\/+$/, '');
+    let clean = customBase.trim().replace(/\/+$/, '');
+    clean = clean.replace(/\/v1(\/request|\/verify)?\/?$/, '');
+    return clean;
   }
   return 'https://gateway.zibal.ir';
 }

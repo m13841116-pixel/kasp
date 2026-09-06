@@ -3,6 +3,8 @@ import { generateWithGemini } from './geminiClient.js';
 
 export type MarketingContext = ResearchOutput | {
   research?: ResearchOutput;
+  competitors?: any;
+  personas?: any;
   competitor?: any;
   customer?: any;
 };

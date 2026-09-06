@@ -26,6 +26,12 @@ import {
   getZibalMode,
   logPaymentDiagnostic
 } from './payments/zibal.js';
+import { BrainStateManager } from './brain/stateManager.js';
+import { KaspBusinessBrain } from './brain/brainOrchestrator.js';
+import { KaspBuildOrchestrator } from './brain/buildOrchestrator.js';
+import { VoiceAdvisorService } from './brain/voiceAdvisor.js';
+import { autonomousManager } from './brain/autonomousExecutionManager.js';
+import { BusinessLoopStage } from './brain/types.js';
 
 const router = Router();
 const managerAgent = new ManagerAgent();
@@ -53,7 +59,8 @@ router.use((req: Request, res: Response, next: NextFunction) => {
       !req.path.startsWith('/ai') &&
       !req.path.startsWith('/improve-idea') &&
       !req.path.startsWith('/payments') &&
-      !req.path.startsWith('/payment')
+      !req.path.startsWith('/payment') &&
+      !req.path.startsWith('/brain')
     ) {
       if (!token || !cookieToken || token !== cookieToken) {
         return res.status(403).json({ error: 'CSRF token missing or invalid' });
@@ -444,7 +451,8 @@ const handleZibalPaymentRequest = async (req: Request, res: Response) => {
       if (!order) {
         return res.status(404).json({ error: 'سفارش موردنظر یافت نشد.' });
       }
-      if (order.userId !== user.id && user.role !== 'admin') {
+      const orderOwner = order.userId || order.userid;
+      if (orderOwner && orderOwner !== user.id && user.role !== 'admin') {
         return res.status(403).json({ error: 'شما به این سفارش دسترسی ندارید.' });
       }
       if (String(order.status || '').toUpperCase() === 'PAID') {
@@ -1425,4 +1433,431 @@ router.get('/ai-team/history', async (req, res) => {
   }
 });
 
+// ==========================================
+// KASP BUSINESS BRAIN (BUSINESS OPERATING SYSTEM)
+// ==========================================
+
+// Get structured BusinessState for a project
+router.get('/brain/state/:projectId', async (req, res) => {
+  try {
+    const user = await getSessionUser(req);
+    const state = await BrainStateManager.getProjectState(req.params.projectId);
+    if (!state) {
+      return res.status(404).json({ error: 'گراف کسب‌وکار برای این پروژه یافت نشد.' });
+    }
+
+    if (state.userId !== user?.id && user?.role !== 'admin') {
+      // Check if project is marked public
+      const project = await queryOne("SELECT isPublic FROM ai_team_projects WHERE id = ?", [req.params.projectId]);
+      if (!project || (!project.isPublic && project.ispublic !== 1)) {
+        return res.status(403).json({ error: 'دسترسی غیرمجاز به گراف کسب‌وکار' });
+      }
+    }
+
+    res.json({ success: true, state });
+  } catch (err: any) {
+    console.error('Error in /api/brain/state/:projectId:', err);
+    res.status(500).json({ error: 'خطا در دریافت وضعیت گراف کسب‌وکار' });
+  }
+});
+
+// Get latest BusinessState for active user
+router.get('/brain/latest', async (req, res) => {
+  try {
+    const user = await getSessionUser(req);
+    if (!user) {
+      return res.status(401).json({ error: 'ابتدا وارد حساب کاربری خود شوید.' });
+    }
+
+    const state = await BrainStateManager.getLatestUserState(user.id);
+    if (!state) {
+      return res.status(404).json({ error: 'هیچ پروژه فعالی برای این کاربر یافت نشد.' });
+    }
+
+    res.json({ success: true, state });
+  } catch (err: any) {
+    console.error('Error in /api/brain/latest:', err);
+    res.status(500).json({ error: 'خطا در دریافت آخرین وضعیت پروژه' });
+  }
+});
+
+// Advance 7-step Core Loop Stage
+const advanceStageSchema = z.object({
+  projectId: z.string().min(1),
+  nextStage: z.enum(['UNDERSTAND', 'RESEARCH', 'DESIGN', 'BUILD', 'LAUNCH', 'MEASURE', 'IMPROVE'])
+});
+
+router.post('/brain/advance-stage', async (req, res) => {
+  try {
+    const user = await getSessionUser(req);
+    if (!user) {
+      return res.status(401).json({ error: 'احراز هویت الزامی است.' });
+    }
+
+    const parsed = advanceStageSchema.parse(req.body);
+    const state = await BrainStateManager.getProjectState(parsed.projectId);
+    if (!state) {
+      return res.status(404).json({ error: 'پروژه یافت نشد.' });
+    }
+    if (state.userId !== user.id && user.role !== 'admin') {
+      return res.status(403).json({ error: 'دسترسی غیرمجاز' });
+    }
+
+    const updated = await BrainStateManager.advanceLoopStage(parsed.projectId, parsed.nextStage as BusinessLoopStage);
+    res.json({ success: true, state: updated });
+  } catch (err: any) {
+    console.error('Error in /api/brain/advance-stage:', err);
+    res.status(400).json({ error: err.message || 'خطا در تغییر مرحله چرخه کسب‌وکار' });
+  }
+});
+
+// Update Task Status & Roadblocks
+const taskStatusSchema = z.object({
+  projectId: z.string().min(1),
+  taskId: z.string().min(1),
+  status: z.enum(['TODO', 'IN_PROGRESS', 'DONE', 'BLOCKED']),
+  blockerReason: z.string().optional()
+});
+
+router.post('/brain/task-status', async (req, res) => {
+  try {
+    const user = await getSessionUser(req);
+    if (!user) {
+      return res.status(401).json({ error: 'احراز هویت الزامی است.' });
+    }
+
+    const parsed = taskStatusSchema.parse(req.body);
+    const state = await BrainStateManager.getProjectState(parsed.projectId);
+    if (!state) {
+      return res.status(404).json({ error: 'پروژه یافت نشد.' });
+    }
+    if (state.userId !== user.id && user.role !== 'admin') {
+      return res.status(403).json({ error: 'دسترسی غیرمجاز' });
+    }
+
+    await BrainStateManager.updateTaskStatus(parsed.projectId, parsed.taskId, parsed.status, parsed.blockerReason);
+    const updated = await BrainStateManager.getProjectState(parsed.projectId);
+    res.json({ success: true, state: updated });
+  } catch (err: any) {
+    console.error('Error in /api/brain/task-status:', err);
+    res.status(400).json({ error: err.message || 'خطا در به‌روزرسانی وضعیت تسک' });
+  }
+});
+
+// Record Strategic Decision
+const recordDecisionSchema = z.object({
+  projectId: z.string().min(1),
+  decision: z.string().min(3),
+  rationale: z.string().min(3),
+  epistemicType: z.enum(['FACT', 'SEARCH_GROUNDED', 'INFERENCE', 'ESTIMATE', 'USER_PROVIDED']).default('INFERENCE')
+});
+
+router.post('/brain/record-decision', async (req, res) => {
+  try {
+    const user = await getSessionUser(req);
+    if (!user) {
+      return res.status(401).json({ error: 'احراز هویت الزامی است.' });
+    }
+
+    const parsed = recordDecisionSchema.parse(req.body);
+    const state = await BrainStateManager.getProjectState(parsed.projectId);
+    if (!state) {
+      return res.status(404).json({ error: 'پروژه یافت نشد.' });
+    }
+    if (state.userId !== user.id && user.role !== 'admin') {
+      return res.status(403).json({ error: 'دسترسی غیرمجاز' });
+    }
+
+    await BrainStateManager.recordDecision(parsed.projectId, parsed.decision, parsed.rationale, parsed.epistemicType);
+    const updated = await BrainStateManager.getProjectState(parsed.projectId);
+    res.json({ success: true, state: updated });
+  } catch (err: any) {
+    console.error('Error in /api/brain/record-decision:', err);
+    res.status(400).json({ error: err.message || 'خطا در ثبت تصمیم استراتژیک' });
+  }
+});
+
+// Get Executive Q&A Answers
+router.get('/brain/executive-qa/:projectId', async (req, res) => {
+  try {
+    const state = await BrainStateManager.getProjectState(req.params.projectId);
+    if (!state) {
+      return res.status(404).json({ error: 'پروژه یافت نشد.' });
+    }
+
+    res.json({
+      success: true,
+      projectId: state.projectId,
+      currentStage: state.currentStage,
+      executiveAnswers: state.executiveMemory.answers,
+      assumptions: state.executiveMemory.assumptionsToValidate,
+      decisionsLog: state.executiveMemory.decisionsLog
+    });
+  } catch (err: any) {
+    console.error('Error in /api/brain/executive-qa/:projectId:', err);
+    res.status(500).json({ error: 'خطا در دریافت پاسخ‌های اجرایی مدیر' });
+  }
+});
+
+// ==========================================
+// KASP BUILD MODE (CAPABILITY 2: BUILD THIS BUSINESS)
+// ==========================================
+const buildOrchestrator = new KaspBuildOrchestrator();
+
+// 1. Get or Generate Execution Plan for a Project
+router.get('/brain/build/plan/:projectId', async (req, res) => {
+  try {
+    const user = await getSessionUser(req);
+    const plan = await buildOrchestrator.getOrCreateExecutionPlan(req.params.projectId);
+    res.json({ success: true, plan });
+  } catch (err: any) {
+    console.error('Error in /api/brain/build/plan/:projectId:', err);
+    res.status(500).json({ error: err.message || 'خطا در بارگذاری نقشه راه ساخت' });
+  }
+});
+
+// 2. Execute Build for an Artifact
+const executeBuildSchema = z.object({
+  projectId: z.string().min(1),
+  artifactId: z.string().min(1),
+  userInputs: z.record(z.string(), z.string()).optional()
+});
+
+router.post('/brain/build/execute', async (req, res) => {
+  try {
+    const user = await getSessionUser(req);
+    if (!user) {
+      return res.status(401).json({ error: 'برای اجرای تسک‌های ساخت، ابتدا وارد حساب کاربری خود شوید.' });
+    }
+
+    const parsed = executeBuildSchema.parse(req.body);
+    const result = await buildOrchestrator.executeArtifactBuild({
+      projectId: parsed.projectId,
+      artifactId: parsed.artifactId,
+      userInputs: parsed.userInputs
+    });
+
+    res.json({ success: true, artifact: result.artifact, log: result.log });
+  } catch (err: any) {
+    console.error('Error in /api/brain/build/execute:', err);
+    res.status(400).json({ error: err.message || 'خطا در اجرای فرآیند ساخت تسک' });
+  }
+});
+
+// 3. Human Approval for Sensitive Build Actions
+const approveBuildSchema = z.object({
+  projectId: z.string().min(1),
+  artifactId: z.string().min(1),
+  notes: z.string().optional()
+});
+
+router.post('/brain/build/approve', async (req, res) => {
+  try {
+    const user = await getSessionUser(req);
+    if (!user) {
+      return res.status(401).json({ error: 'احراز هویت الزامی است.' });
+    }
+
+    const parsed = approveBuildSchema.parse(req.body);
+    const artifact = await buildOrchestrator.approveArtifact(parsed.projectId, parsed.artifactId, parsed.notes);
+
+    res.json({ success: true, artifact });
+  } catch (err: any) {
+    console.error('Error in /api/brain/build/approve:', err);
+    res.status(400).json({ error: err.message || 'خطا در ثبت تایید انسانی' });
+  }
+});
+
+// 4. Get Persistent Execution Logs
+router.get('/brain/build/logs/:projectId', async (req, res) => {
+  try {
+    const logs = await buildOrchestrator.getExecutionLogs(req.params.projectId);
+    res.json({ success: true, logs });
+  } catch (err: any) {
+    console.error('Error in /api/brain/build/logs/:projectId:', err);
+    res.status(500).json({ error: 'خطا در دریافت تاریخچه اجرای ساخت' });
+  }
+});
+
+// ==========================================
+// KASP VOICE ADVISOR (EXECUTIVE SPOKEN BRIEFING & VOICE ARCHITECTURE)
+// ==========================================
+
+// 1. Get Existing Voice Briefing for Project
+router.get('/brain/voice/briefing/:projectId', async (req, res) => {
+  try {
+    const briefing = await VoiceAdvisorService.getBriefing(req.params.projectId);
+    res.json({ success: true, briefing });
+  } catch (err: any) {
+    console.error('Error in GET /api/brain/voice/briefing/:projectId:', err);
+    res.status(500).json({ error: 'خطا در بارگذاری صدای مشاور' });
+  }
+});
+
+// 2. Generate or Regenerate Executive Spoken Briefing
+const generateVoiceBriefingSchema = z.object({
+  projectId: z.string().min(1)
+});
+
+router.post('/brain/voice/briefing/generate', async (req, res) => {
+  try {
+    const user = await getSessionUser(req);
+    const parsed = generateVoiceBriefingSchema.parse(req.body);
+    const briefing = await VoiceAdvisorService.generateBriefing(parsed.projectId, user?.id);
+    res.json({ success: true, briefing });
+  } catch (err: any) {
+    console.error('Error in POST /api/brain/voice/briefing/generate:', err);
+    res.status(500).json({ error: err.message || 'خطا در تولید خلاصه اجرایی صوتی مشاور' });
+  }
+});
+
+// 3. Conversational Voice Advisor Interaction (Speech-in / Speech-out Architecture)
+const voiceInteractSchema = z.object({
+  projectId: z.string().min(1),
+  userSpeechText: z.string().min(1),
+  contextMode: z.enum(['strategic', 'tactical', 'financial', 'general']).optional()
+});
+
+router.post('/brain/voice/interact', async (req, res) => {
+  try {
+    const user = await getSessionUser(req);
+    const parsed = voiceInteractSchema.parse(req.body);
+    const result = await VoiceAdvisorService.processVoiceInteraction({
+      projectId: parsed.projectId,
+      userSpeechText: parsed.userSpeechText,
+      contextMode: parsed.contextMode
+    }, user?.id);
+
+    res.json({ success: true, response: result });
+  } catch (err: any) {
+    console.error('Error in POST /api/brain/voice/interact:', err);
+    res.status(400).json({ error: err.message || 'خطا در پردازش گفتگوی صوتی با مشاور' });
+  }
+});
+
+// ==========================================
+// KASP AUTONOMOUS EXECUTION LAYER (AI WORKFORCE)
+// ==========================================
+
+// 1. Get complete Autonomous Execution State (Goal, State, Plan, Queue, Active, Blocked, Completed, Metrics, Learning, Approvals)
+router.get('/brain/execution/:projectId', async (req, res) => {
+  try {
+    const user = await getSessionUser(req);
+    const state = await autonomousManager.getOrCreateExecutionState(req.params.projectId, user?.id);
+    res.json({ success: true, state });
+  } catch (err: any) {
+    console.error('Error in GET /api/brain/execution/:projectId:', err);
+    res.status(500).json({ error: err.message || 'خطا در بارگذاری لایه اجرایی خودکار' });
+  }
+});
+
+// 2. Initialize Autonomous Project from user Goal / Request
+const initExecutionSchema = z.object({
+  projectId: z.string().min(1),
+  goal: z.string().min(3).optional(),
+  businessName: z.string().optional()
+});
+
+router.post('/brain/execution/initialize', async (req, res) => {
+  try {
+    const user = await getSessionUser(req);
+    const parsed = initExecutionSchema.parse(req.body);
+    const state = await autonomousManager.getOrCreateExecutionState(parsed.projectId, user?.id, parsed.goal);
+    res.json({ success: true, state });
+  } catch (err: any) {
+    console.error('Error in POST /api/brain/execution/initialize:', err);
+    res.status(400).json({ error: err.message || 'خطا در مقداردهی اولیه پروژه اجرایی' });
+  }
+});
+
+// 3. Execute Specific Task by Workforce
+const executeTaskSchema = z.object({
+  projectId: z.string().min(1),
+  taskId: z.string().min(1),
+  userInputs: z.record(z.string(), z.string()).optional()
+});
+
+router.post('/brain/execution/execute-task', async (req, res) => {
+  try {
+    const user = await getSessionUser(req);
+    if (!user) {
+      return res.status(401).json({ error: 'برای اجرای تسک‌های نیروی کار هوشمند، ابتدا وارد حساب کاربری خود شوید.' });
+    }
+
+    const parsed = executeTaskSchema.parse(req.body);
+    const result = await autonomousManager.executeTask(parsed.projectId, parsed.taskId, parsed.userInputs);
+    res.json({ success: true, state: result.state, executedTask: result.executedTask, newLearning: result.newLearning });
+  } catch (err: any) {
+    console.error('Error in POST /api/brain/execution/execute-task:', err);
+    res.status(400).json({ error: err.message || 'خطا در اجرای تسک هوشمند' });
+  }
+});
+
+// 4. Autonomous Next Task Trigger (Manager chooses & executes next highest-value action)
+const executeNextTaskSchema = z.object({
+  projectId: z.string().min(1)
+});
+
+router.post('/brain/execution/next-task', async (req, res) => {
+  try {
+    const user = await getSessionUser(req);
+    if (!user) {
+      return res.status(401).json({ error: 'برای اجرای خودکار گام بعد، ابتدا وارد حساب کاربری خود شوید.' });
+    }
+
+    const parsed = executeNextTaskSchema.parse(req.body);
+    const state = await autonomousManager.getOrCreateExecutionState(parsed.projectId, user?.id);
+    const recommendation = state.nextRecommendedTask || autonomousManager.determineNextHighestValueTask(state);
+
+    if (!recommendation) {
+      return res.json({ success: true, state, message: 'تمام تسک‌های فاز جاری تکمیل شده‌اند.' });
+    }
+
+    if (recommendation.isApprovalRequired) {
+      return res.status(400).json({
+        error: 'این اقدام نیازمند تایید مستقیم شما در مرکز تاییدهای KASP است.',
+        requiresApproval: true,
+        task: recommendation.task
+      });
+    }
+
+    const result = await autonomousManager.executeTask(parsed.projectId, recommendation.task.id);
+    res.json({ success: true, state: result.state, executedTask: result.executedTask, newLearning: result.newLearning });
+  } catch (err: any) {
+    console.error('Error in POST /api/brain/execution/next-task:', err);
+    res.status(400).json({ error: err.message || 'خطا در اجرای گام بعدی' });
+  }
+});
+
+// 5. Approval Center Decision Handler (Approve or Reject with immediate execution & logging)
+const approvalActionSchema = z.object({
+  projectId: z.string().min(1),
+  approvalId: z.string().min(1),
+  decision: z.enum(['APPROVE', 'REJECT']),
+  notes: z.string().optional()
+});
+
+router.post('/brain/execution/approval/action', async (req, res) => {
+  try {
+    const user = await getSessionUser(req);
+    if (!user) {
+      return res.status(401).json({ error: 'برای تایید اقدامات، احراز هویت الزامی است.' });
+    }
+
+    const parsed = approvalActionSchema.parse(req.body);
+    const result = await autonomousManager.handleApprovalDecision({
+      projectId: parsed.projectId,
+      approvalId: parsed.approvalId,
+      decision: parsed.decision,
+      notes: parsed.notes
+    });
+
+    res.json({ success: true, approval: result.approval, state: result.state });
+  } catch (err: any) {
+    console.error('Error in POST /api/brain/execution/approval/action:', err);
+    res.status(400).json({ error: err.message || 'خطا در ثبت تصمیم تاییدیه' });
+  }
+});
+
 export default router;
+

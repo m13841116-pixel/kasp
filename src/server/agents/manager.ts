@@ -17,6 +17,7 @@ import { CompetitorAgent } from './competitor.js';
 import { CustomerAgent } from './customer.js';
 import { MarketingAgent } from './marketing.js';
 import { generateWithGemini } from './geminiClient.js';
+import { KaspBusinessBrain } from '../brain/brainOrchestrator.js';
 
 export interface WorkflowStageEvent {
   stage: 
@@ -104,8 +105,28 @@ export class ManagerAgent implements AgentInterface<any, FinalBusinessReport> {
     onStageUpdate?: (event: WorkflowStageEvent) => void
   ): Promise<AgentResult<FinalBusinessReport>> {
     const startTime = Date.now();
-    const projectId = `proj-${crypto.randomUUID()}`;
     const rawGoal = input.goal.trim();
+
+    try {
+      const brain = new KaspBusinessBrain();
+      const { report } = await brain.executeFullBusinessLoop({
+        userId: (input.contextData as any)?.userId || 'guest',
+        rawGoal,
+        onStageUpdate
+      });
+
+      return {
+        success: true,
+        role: this.role,
+        agentName: this.name,
+        data: report,
+        executionTimeMs: Date.now() - startTime
+      };
+    } catch (brainErr) {
+      console.warn('[ManagerAgent] Brain pipeline warning, falling back to direct agent pipeline:', brainErr);
+    }
+
+    const projectId = `proj-${crypto.randomUUID()}`;
 
     // 1. Manager Planning
     if (onStageUpdate) {

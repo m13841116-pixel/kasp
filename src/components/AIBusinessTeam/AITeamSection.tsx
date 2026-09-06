@@ -31,11 +31,17 @@ import {
   Info,
   Calendar,
   Zap,
-  CheckCircle
+  CheckCircle,
+  Hammer,
+  Mic,
+  Radio
 } from 'lucide-react';
 import { FinalBusinessReport } from '../../server/agents/types';
 import { PaymentModal } from '../PaymentModal';
 import { CustomerProjectConversation } from '../CustomerProjectConversation';
+import { KaspBuildMode } from './KaspBuildMode';
+import { VoiceAdvisorCard } from './VoiceAdvisorCard';
+import { AutonomousWorkforce } from './AutonomousWorkforce';
 import { apiFetch } from '../../utils/api';
 
 interface AITeamSectionProps {
@@ -108,6 +114,7 @@ export const AITeamSection: React.FC<AITeamSectionProps> = ({
   const [copied, setCopied] = useState(false);
   const [copiedSummary, setCopiedSummary] = useState(false);
   const [activeTab, setActiveTab] = useState<'overview' | 'research' | 'marketing' | 'kaspPlan'>('overview');
+  const [majorCapability, setMajorCapability] = useState<'workforce' | 'analysis' | 'build' | 'voice'>('workforce');
   
   // Smart Goal Clarification (Step 2: Understanding the goal)
   const [showClarification, setShowClarification] = useState(false);
@@ -1148,9 +1155,87 @@ ${(report.actionPlan30Days || []).slice(0, 2).map(p => `• [${p.timeframe}] ${p
           </div>
         )}
 
-        {/* FINAL COMPREHENSIVE BUSINESS INTELLIGENCE REPORT */}
+        {/* FINAL COMPREHENSIVE BUSINESS INTELLIGENCE REPORT & BUILD MODE */}
         {report && (
-          <div id="kasp-final-report-document" className="max-w-5xl mx-auto bg-slate-950/90 border border-slate-800 rounded-[2.5rem] shadow-2xl overflow-hidden animate-fadeIn">
+          <div className="max-w-5xl mx-auto space-y-6">
+            
+            {/* Major Capability Selector Switcher */}
+            <div className="bg-slate-900/90 border border-slate-800 p-2 rounded-2xl grid grid-cols-2 md:grid-cols-4 items-center gap-2 shadow-2xl">
+              <button
+                onClick={() => setMajorCapability('workforce')}
+                className={`w-full py-3 px-3 rounded-xl text-xs sm:text-sm font-black transition flex items-center justify-center gap-2 ${
+                  majorCapability === 'workforce'
+                    ? 'bg-gradient-to-r from-amber-500 via-amber-400 to-amber-500 text-slate-950 shadow-lg shadow-amber-500/25'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                }`}
+              >
+                <Zap className="w-4 h-4 fill-current text-slate-950" />
+                <span>۱. نیروی کار اجرایی</span>
+                <span className="px-1.5 py-0.5 bg-slate-950/20 text-slate-900 text-[10px] font-black rounded-full">اصلی</span>
+              </button>
+
+              <button
+                onClick={() => setMajorCapability('analysis')}
+                className={`w-full py-3 px-3 rounded-xl text-xs sm:text-sm font-black transition flex items-center justify-center gap-2 ${
+                  majorCapability === 'analysis'
+                    ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                }`}
+              >
+                <BrainCircuit className="w-4 h-4" />
+                <span>۲. تحلیل و پژوهش</span>
+              </button>
+
+              <button
+                onClick={() => setMajorCapability('build')}
+                className={`w-full py-3 px-3 rounded-xl text-xs sm:text-sm font-black transition flex items-center justify-center gap-2 ${
+                  majorCapability === 'build'
+                    ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-lg shadow-purple-600/30'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                }`}
+              >
+                <Hammer className="w-4 h-4 text-amber-300" />
+                <span>۳. ساخت دارایی‌ها</span>
+              </button>
+
+              <button
+                onClick={() => setMajorCapability('voice')}
+                className={`w-full py-3 px-3 rounded-xl text-xs sm:text-sm font-black transition flex items-center justify-center gap-2 ${
+                  majorCapability === 'voice'
+                    ? 'bg-gradient-to-r from-amber-500 to-indigo-600 text-white shadow-lg shadow-amber-600/30'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                }`}
+              >
+                <Mic className="w-4 h-4 text-amber-300" />
+                <span>۴. مشاور صوتی</span>
+                <span className="px-1.5 py-0.5 bg-indigo-500 text-white text-[10px] font-black rounded-full">صوتی</span>
+              </button>
+            </div>
+
+            {majorCapability === 'workforce' ? (
+              <AutonomousWorkforce
+                projectId={report.id}
+                businessGoal={report.businessGoal}
+                onBackToAnalysis={() => setMajorCapability('analysis')}
+                onRequireLogin={onRequireLogin}
+              />
+            ) : majorCapability === 'build' ? (
+              <KaspBuildMode
+                projectId={report.id}
+                businessGoal={report.businessGoal}
+                onBackToAnalysis={() => setMajorCapability('analysis')}
+                onRequireLogin={onRequireLogin}
+              />
+            ) : majorCapability === 'voice' ? (
+              <div className="space-y-6 animate-fadeIn">
+                <VoiceAdvisorCard
+                  projectId={report.id}
+                  businessGoal={report.businessGoal}
+                  businessName={report.businessGoal}
+                />
+              </div>
+            ) : (
+              <div id="kasp-final-report-document" className="bg-slate-950/90 border border-slate-800 rounded-[2.5rem] shadow-2xl overflow-hidden animate-fadeIn">
             
             {/* Report Header */}
             <div className="bg-gradient-to-r from-slate-900 via-indigo-950/60 to-slate-900 p-6 sm:p-8 border-b border-slate-800 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
@@ -1183,11 +1268,35 @@ ${(report.actionPlan30Days || []).slice(0, 2).map(p => `• [${p.timeframe}] ${p
               {/* Action & Sales-Ready Export Buttons */}
               <div className="flex flex-wrap items-center gap-2 shrink-0">
                 <button
+                  onClick={() => setMajorCapability('workforce')}
+                  className="px-4 py-2.5 bg-gradient-to-r from-amber-500 via-amber-400 to-amber-500 hover:from-amber-400 hover:to-amber-300 text-slate-950 text-xs font-black rounded-xl shadow-lg shadow-amber-500/25 flex items-center gap-1.5 transition-all hover:scale-[1.02] active:scale-95"
+                >
+                  <Zap className="w-4 h-4 fill-slate-950 text-slate-950" />
+                  <span>🚀 نیروی کار اجرایی KASP</span>
+                </button>
+
+                <button
+                  onClick={() => setMajorCapability('voice')}
+                  className="px-4 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white text-xs font-black rounded-xl shadow-lg shadow-indigo-600/20 flex items-center gap-1.5 transition-all hover:scale-[1.02] active:scale-95"
+                >
+                  <Mic className="w-4 h-4 text-amber-300 animate-pulse" />
+                  <span>🎙️ از مشاور KASP بشنو</span>
+                </button>
+
+                <button
+                  onClick={() => setMajorCapability('build')}
+                  className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-white text-xs font-black rounded-xl border border-slate-700 flex items-center gap-1.5 transition-all hover:scale-[1.02] active:scale-95"
+                >
+                  <Hammer className="w-4 h-4 text-amber-300" />
+                  <span>ساخت دارایی‌ها</span>
+                </button>
+
+                <button
                   onClick={handleGetFullReportCTA}
-                  className="px-4 py-2.5 bg-gradient-to-r from-amber-500 via-indigo-600 to-emerald-600 hover:from-amber-400 hover:to-emerald-500 text-white text-xs font-black rounded-xl shadow-lg shadow-indigo-600/20 flex items-center gap-1.5 transition-all hover:scale-[1.02] active:scale-95"
+                  className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold rounded-xl border border-slate-700 flex items-center gap-1.5 transition-all"
                 >
                   <Sparkles className="w-4 h-4" />
-                  <span>نقشه اقدام ۳۰ روزه</span>
+                  <span>اقدام ۳۰ روزه</span>
                 </button>
 
                 <button
@@ -1214,7 +1323,7 @@ ${(report.actionPlan30Days || []).slice(0, 2).map(p => `• [${p.timeframe}] ${p
                   title="چاپ یا ذخیره خروجی تمیز PDF"
                 >
                   <Download className="w-4 h-4" />
-                  <span>Download PDF</span>
+                  <span>PDF</span>
                 </button>
 
                 <button
@@ -1222,9 +1331,18 @@ ${(report.actionPlan30Days || []).slice(0, 2).map(p => `• [${p.timeframe}] ${p
                   className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold rounded-xl border border-slate-700 flex items-center gap-1.5 transition-all"
                 >
                   <Search className="w-3.5 h-3.5 text-purple-400" />
-                  <span>مشاهده منابع</span>
+                  <span>منابع</span>
                 </button>
               </div>
+            </div>
+
+            {/* Embedded Voice Advisor Card in Overview */}
+            <div className="p-6 sm:p-8 pb-2">
+              <VoiceAdvisorCard
+                projectId={report.id}
+                businessGoal={report.businessGoal}
+                businessName={report.businessGoal}
+              />
             </div>
 
             {/* Navigation Tabs */}
@@ -1956,6 +2074,18 @@ ${(report.actionPlan30Days || []).slice(0, 2).map(p => `• [${p.timeframe}] ${p
                     <div className="flex flex-col sm:flex-row items-center gap-4 pt-4 border-t border-slate-800">
                       <button
                         onClick={() => {
+                          setMajorCapability('build');
+                          const buildElem = document.getElementById('kasp-final-report-document') || document.querySelector('.bg-slate-900\\/90');
+                          buildElem?.scrollIntoView({ behavior: 'smooth' });
+                        }}
+                        className="w-full sm:w-auto px-8 py-4 rounded-xl bg-gradient-to-r from-amber-500 via-indigo-600 to-emerald-600 hover:from-amber-400 hover:to-emerald-500 text-white font-black text-sm sm:text-base shadow-xl shadow-emerald-600/30 flex items-center justify-center gap-2 transition-all hover:scale-[1.03] active:scale-95"
+                      >
+                        <Hammer className="w-5 h-5 text-amber-300" />
+                        <span>ساخت این کسب‌وکار (ورود به KASP Build Mode)</span>
+                      </button>
+
+                      <button
+                        onClick={() => {
                           if (onRequestCustomApp) {
                             onRequestCustomApp(`برنامه اجرایی و ساخت نرم‌افزار: ${report.businessGoal}`);
                           } else {
@@ -1963,19 +2093,19 @@ ${(report.actionPlan30Days || []).slice(0, 2).map(p => `• [${p.timeframe}] ${p
                             customSection?.scrollIntoView({ behavior: 'smooth' });
                           }
                         }}
-                        className="w-full sm:w-auto px-8 py-4 rounded-xl bg-gradient-to-r from-amber-500 via-indigo-600 to-emerald-600 hover:from-amber-400 hover:to-emerald-500 text-white font-black text-sm sm:text-base shadow-xl shadow-indigo-600/30 flex items-center justify-center gap-2 transition-all hover:scale-[1.03] active:scale-95"
+                        className="w-full sm:w-auto px-6 py-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs sm:text-sm border border-slate-700 flex items-center justify-center gap-2 transition-all"
                       >
-                        <Sparkles className="w-5 h-5" />
-                        <span>سفارش پیاده‌سازی و ساخت فنی این پروژه با تخفیف ویژه</span>
+                        <Sparkles className="w-4 h-4 text-amber-400" />
+                        <span>سفارش اختصاصی به تیم فنی KASP</span>
                       </button>
 
                       <a
                         href="https://t.me/kasp0000"
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="w-full sm:w-auto px-6 py-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs sm:text-sm border border-slate-700 flex items-center justify-center gap-2 transition-all"
+                        className="w-full sm:w-auto px-5 py-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs sm:text-sm border border-slate-700 flex items-center justify-center gap-2 transition-all"
                       >
-                        <span>گفتگو با مشاور ارشد KASP در تلگرام</span>
+                        <span>مشاور در تلگرام</span>
                       </a>
                     </div>
 
@@ -2017,6 +2147,8 @@ ${(report.actionPlan30Days || []).slice(0, 2).map(p => `• [${p.timeframe}] ${p
               </button>
             </div>
 
+          </div>
+            )}
           </div>
         )}
 
