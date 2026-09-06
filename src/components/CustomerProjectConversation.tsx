@@ -5,7 +5,10 @@ import {
   CheckCircle2, 
   Clock, 
   User,
-  Bot
+  Bot,
+  Mic,
+  Video,
+  Sparkles
 } from 'lucide-react';
 
 export const CustomerProjectConversation: React.FC<{ report?: any }> = ({ report }) => {
@@ -14,18 +17,24 @@ export const CustomerProjectConversation: React.FC<{ report?: any }> = ({ report
     {
       id: 1,
       sender: 'admin',
-      text: 'گزارش ۱۴ بخشی هوش تجاری KASP آماده شد. اکنون اگر درباره فازهای اجرا، رقبا، یا جزئیات برنامه اقدام سوالی دارید، بپرسید.',
+      text: 'گزارش ۱۵ بخشی هوش تجاری KASP آماده است. اکنون اگر درباره فازهای اجرا، رقبا، قیمت‌گذاری، یا توصیه استراتژیک سوالی دارید، بپرسید.',
       time: 'همین الان',
       attachments: []
     }
   ]);
   const [newMessage, setNewMessage] = useState('');
 
-    const handleSendMessage = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newMessage.trim() || isLoading) return;
+  const QUICK_QUESTIONS = [
+    'اولین قدم من در این هفته چیست؟',
+    'چطور با رقیب اصلی خودم رقابت کنم؟',
+    'بهترین استراتژی قیمت‌گذاری برای شروع چیست؟',
+    'بزرگ‌ترین ریسکی که باید مراقبش باشم چیست؟'
+  ];
+
+  const handleSendMessage = async (customText?: string) => {
+    const userText = (customText || newMessage).trim();
+    if (!userText || isLoading) return;
     
-    const userText = newMessage.trim();
     const newMsg = {
       id: Date.now(),
       sender: 'customer',
@@ -54,7 +63,7 @@ export const CustomerProjectConversation: React.FC<{ report?: any }> = ({ report
         setMessages(prev => [...prev, {
           id: Date.now() + 1,
           sender: 'admin',
-          text: data.reply || 'مشکلی پیش آمد.',
+          text: data.reply || 'پاسخ دریافت نشد.',
           time: 'همین الان',
           attachments: []
         }]);
@@ -65,7 +74,7 @@ export const CustomerProjectConversation: React.FC<{ report?: any }> = ({ report
       setMessages(prev => [...prev, {
         id: Date.now() + 1,
         sender: 'admin',
-        text: 'خطا در برقراری ارتباط با سرور. لطفاً دوباره تلاش کنید.',
+        text: 'خطا در برقراری ارتباط با مشاور هوش مصنوعی KASP. لطفاً دوباره تلاش کنید.',
         time: 'همین الان',
         attachments: []
       }]);
@@ -75,85 +84,116 @@ export const CustomerProjectConversation: React.FC<{ report?: any }> = ({ report
   };
 
   return (
-    <div className="flex flex-col h-[600px] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700/50 rounded-2xl overflow-hidden relative z-10 shadow-lg">
+    <div className="flex flex-col h-[650px] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl overflow-hidden relative z-10 shadow-xl">
       
       {/* Header */}
-      <div className="bg-slate-50 dark:bg-slate-800/80 p-4 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
+      <div className="bg-slate-50 dark:bg-slate-850 p-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-blue-500/10 dark:bg-blue-600/20 text-blue-600 dark:text-blue-400 flex items-center justify-center border border-blue-500/30">
+          <div className="w-10 h-10 rounded-2xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center border border-indigo-500/30">
             <Bot className="w-5 h-5" />
           </div>
           <div>
-            <h3 className="text-sm font-bold text-slate-900 dark:text-white">مدیر هوش مصنوعی KASP</h3>
-            <p className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1 mt-0.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 dark:bg-emerald-400 animate-pulse" />
-              پاسخگویی سریع
+            <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+              <span>مشاور هوشمند KASP (مدیر استراتژی)</span>
+            </h3>
+            <p className="text-[11px] text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1.5 mt-0.5">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              آنلاین و مسلط بر گزارش ۱۵ بخشی پروژه
             </p>
           </div>
         </div>
-        <div className="px-3 py-1.5 rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 text-[10px] font-bold">
-          پروژه در حال بررسی
+
+        {/* Future Voice / Video Advisor Teaser */}
+        <div className="flex items-center gap-2 bg-indigo-950/40 border border-indigo-500/30 px-3 py-1.5 rounded-xl">
+          <div className="flex items-center gap-1.5 text-indigo-400">
+            <Mic className="w-3.5 h-3.5" />
+            <Video className="w-3.5 h-3.5" />
+          </div>
+          <span className="text-[11px] font-bold text-indigo-300">
+            مشاوره صوتی و تصویری KASP (به‌زودی)
+          </span>
         </div>
       </div>
 
+      {/* Quick Prompt Chips */}
+      <div className="bg-slate-100 dark:bg-slate-950/60 px-4 py-2 border-b border-slate-200 dark:border-slate-800/80 flex items-center gap-2 overflow-x-auto">
+        <span className="text-[11px] text-slate-500 font-bold shrink-0 flex items-center gap-1">
+          <Sparkles className="w-3 h-3 text-amber-500" />
+          پرسش‌های سریع:
+        </span>
+        {QUICK_QUESTIONS.map((q, idx) => (
+          <button
+            key={idx}
+            type="button"
+            onClick={() => handleSendMessage(q)}
+            disabled={isLoading}
+            className="text-[11px] px-2.5 py-1 rounded-lg bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-indigo-50 dark:hover:bg-slate-700 hover:text-indigo-600 dark:hover:text-white border border-slate-200 dark:border-slate-700 transition-colors whitespace-nowrap shrink-0 disabled:opacity-50"
+          >
+            {q}
+          </button>
+        ))}
+      </div>
+
       {/* Messages Area */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-6">
+      <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {messages.map((msg) => {
           const isAdmin = msg.sender === 'admin';
           return (
             <div key={msg.id} className={`flex gap-3 max-w-[85%] ${isAdmin ? 'self-start' : 'self-end flex-row-reverse float-left w-full'}`}>
-              <div className={`w-8 h-8 rounded-full shrink-0 flex items-center justify-center border ${
-                isAdmin ? 'bg-blue-500/10 dark:bg-blue-600/20 text-blue-600 dark:text-blue-400 border-blue-500/30' : 'bg-purple-500/10 dark:bg-purple-600/20 text-purple-600 dark:text-purple-400 border-purple-500/30'
+              <div className={`w-8 h-8 rounded-xl shrink-0 flex items-center justify-center border ${
+                isAdmin ? 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/30' : 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/30'
               }`}>
                 {isAdmin ? <Bot className="w-4 h-4" /> : <User className="w-4 h-4" />}
               </div>
               <div className={`space-y-1 ${!isAdmin && 'flex flex-col items-end'}`}>
-                <div className={`px-4 py-2.5 rounded-2xl text-sm leading-relaxed shadow-sm ${
+                <div className={`px-4 py-3 rounded-2xl text-xs sm:text-sm leading-relaxed shadow-sm whitespace-pre-line ${
                   isAdmin 
                     ? 'bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-slate-200 rounded-tr-sm border border-slate-200 dark:border-slate-700/50' 
-                    : 'bg-purple-100 dark:bg-purple-600/20 text-purple-900 dark:text-purple-100 rounded-tl-sm border border-purple-300 dark:border-purple-500/30 text-right'
+                    : 'bg-indigo-600 text-white rounded-tl-sm text-right'
                 }`}>
                   {msg.text}
                 </div>
-                <span className="text-[10px] text-slate-500 font-medium px-1">
+                <span className="text-[10px] text-slate-400 font-medium px-1">
                   {msg.time}
                 </span>
               </div>
             </div>
           );
         })}
+        {isLoading && (
+          <div className="flex gap-3 max-w-[85%] self-start">
+            <div className="w-8 h-8 rounded-xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/30 flex items-center justify-center">
+              <Bot className="w-4 h-4" />
+            </div>
+            <div className="px-4 py-3 rounded-2xl bg-slate-100 dark:bg-slate-800 text-xs text-slate-400 flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-indigo-400 animate-ping"></span>
+              <span>مشاور KASP در حال تحلیل و پاسخ...</span>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Input Area */}
-      <div className="p-4 bg-slate-50 dark:bg-slate-800/50 border-t border-slate-200 dark:border-slate-700">
-        <form onSubmit={handleSendMessage} className="flex items-center gap-2">
-          <button
-            type="button"
-            className="p-3 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white bg-white dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-xl transition-colors border border-slate-200 dark:border-slate-700 shrink-0"
-            title="پیوست فایل"
-          >
-            <Paperclip className="w-5 h-5" />
-          </button>
-          
+      <div className="p-4 bg-slate-50 dark:bg-slate-850 border-t border-slate-200 dark:border-slate-800">
+        <form onSubmit={(e) => { e.preventDefault(); handleSendMessage(); }} className="flex items-center gap-2">
           <input
             type="text"
             value={newMessage}
             onChange={(e) => setNewMessage(e.target.value)}
-            placeholder="پیام خود را بنویسید..."
-            className="flex-1 px-4 py-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white text-sm focus:outline-none focus:border-purple-500 transition-colors"
+            disabled={isLoading}
+            placeholder="سوال خود را درباره گزارش، استراتژی یا اجرای نقشه راه بپرسید..."
+            className="flex-1 px-4 py-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white text-xs sm:text-sm focus:outline-none focus:border-indigo-500 transition-colors disabled:opacity-50"
           />
           
           <button
             type="submit"
-            disabled={!newMessage.trim()}
-            className="p-3 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white rounded-xl shadow-lg shadow-purple-500/25 disabled:opacity-50 transition-all shrink-0"
+            disabled={!newMessage.trim() || isLoading}
+            className="px-4 py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl shadow-lg shadow-indigo-600/25 disabled:opacity-50 transition-all shrink-0 flex items-center gap-1.5 text-xs font-bold"
           >
-            <Send className="w-5 h-5" />
+            <span>ارسال</span>
+            <Send className="w-4 h-4" />
           </button>
         </form>
-        <p className="text-[10px] text-center text-slate-500 mt-2">
-          فایل‌های مجاز: PDF, JPG, PNG (حداکثر ۵ مگابایت)
-        </p>
       </div>
 
     </div>

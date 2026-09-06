@@ -69,9 +69,6 @@ export async function initDb() {
           await pool.query("ALTER TABLE discount_codes ADD COLUMN IF NOT EXISTS assignedUserId TEXT;");
           await pool.query("ALTER TABLE discount_codes ADD COLUMN IF NOT EXISTS expiresAt TEXT;");
           await pool.query("ALTER TABLE ai_team_projects ADD COLUMN IF NOT EXISTS isPublic INTEGER DEFAULT 0;");
-          await pool.query("ALTER TABLE payment_receipts ADD COLUMN IF NOT EXISTS orderId TEXT;");
-          await pool.query("ALTER TABLE payment_receipts ADD COLUMN IF NOT EXISTS productType TEXT;");
-          await pool.query("ALTER TABLE payment_receipts ADD COLUMN IF NOT EXISTS productCode TEXT;");
           await pool.query("ALTER TABLE ai_orders ADD COLUMN IF NOT EXISTS trackId TEXT;");
           await pool.query("ALTER TABLE ai_orders ADD COLUMN IF NOT EXISTS refNumber TEXT;");
           await pool.query("ALTER TABLE ai_orders ADD COLUMN IF NOT EXISTS gateway TEXT;");
@@ -146,15 +143,6 @@ export async function initDb() {
     } catch (e) {}
     try {
       sqliteDb.run("ALTER TABLE ai_team_projects ADD COLUMN isPublic INTEGER DEFAULT 0");
-    } catch (e) {}
-    try {
-      sqliteDb.run("ALTER TABLE payment_receipts ADD COLUMN orderId TEXT");
-    } catch (e) {}
-    try {
-      sqliteDb.run("ALTER TABLE payment_receipts ADD COLUMN productType TEXT");
-    } catch (e) {}
-    try {
-      sqliteDb.run("ALTER TABLE payment_receipts ADD COLUMN productCode TEXT");
     } catch (e) {}
     try {
       sqliteDb.run("ALTER TABLE ai_orders ADD COLUMN trackId TEXT");
@@ -295,17 +283,6 @@ async function createTablesPg() {
       mode TEXT,
       apiKey TEXT
     );
-    CREATE TABLE IF NOT EXISTS payment_receipts (
-      id TEXT PRIMARY KEY,
-      userId TEXT,
-      customerName TEXT,
-      trackingCode TEXT,
-      senderName TEXT,
-      amount TEXT,
-      receiptImage TEXT,
-      note TEXT,
-      status TEXT
-    );
     CREATE TABLE IF NOT EXISTS banner_config (
       id SERIAL PRIMARY KEY,
       text TEXT,
@@ -376,7 +353,6 @@ function createTablesSqlite() {
     CREATE TABLE IF NOT EXISTS freelancers (id TEXT PRIMARY KEY, name TEXT, specialty TEXT, status TEXT, rate REAL, rateNum INTEGER, experience INTEGER, rating REAL, completedProjects INTEGER, avatar TEXT, email TEXT, phone TEXT);
     CREATE TABLE IF NOT EXISTS app_requests (id TEXT PRIMARY KEY, userName TEXT, contactInfo TEXT, idea TEXT, budget REAL, status TEXT, aiAnalysis TEXT);
     CREATE TABLE IF NOT EXISTS payment_settings (id INTEGER PRIMARY KEY AUTOINCREMENT, bankName TEXT, cardNumber TEXT, accountHolder TEXT, iban TEXT, isOnlineGatewayActive INTEGER, provider TEXT, mode TEXT, apiKey TEXT);
-    CREATE TABLE IF NOT EXISTS payment_receipts (id TEXT PRIMARY KEY, userId TEXT, customerName TEXT, trackingCode TEXT, senderName TEXT, amount TEXT, receiptImage TEXT, note TEXT, status TEXT, orderId TEXT, productType TEXT, productCode TEXT);
     CREATE TABLE IF NOT EXISTS banner_config (id INTEGER PRIMARY KEY AUTOINCREMENT, text TEXT, link TEXT, isActive INTEGER, color TEXT);
     CREATE TABLE IF NOT EXISTS discount_codes (code TEXT PRIMARY KEY, prize TEXT, discountPercent INTEGER, isUsed INTEGER DEFAULT 0, usedBy TEXT, assignedUserId TEXT, expiresAt TEXT, createdAt TEXT);
     CREATE TABLE IF NOT EXISTS wheel_settings (id INTEGER PRIMARY KEY DEFAULT 1, maxSpins INTEGER DEFAULT 3);

@@ -42,7 +42,6 @@ const FreelancerCRMModule = lazy(() => import('./components/AdminPanel/Freelance
 const ManageDiscountsModule = lazy(() => import('./components/AdminPanel/ManageDiscountsModule').then(m => ({ default: m.ManageDiscountsModule })));
 const SiteSettingsModule = lazy(() => import('./components/AdminPanel/SiteSettingsModule').then(m => ({ default: m.SiteSettingsModule })));
 const PaymentSettingsModule = lazy(() => import('./components/AdminPanel/PaymentSettingsModule').then(m => ({ default: m.PaymentSettingsModule })));
-const PaymentReceiptsModule = lazy(() => import('./components/AdminPanel/PaymentReceiptsModule').then(m => ({ default: m.PaymentReceiptsModule })));
 const AuthForm = lazy(() => import('./components/AuthForm').then(m => ({ default: m.AuthForm })));
 const CustomerDashboard = lazy(() => import('./components/CustomerDashboard').then(m => ({ default: m.CustomerDashboard })));
 
@@ -624,10 +623,6 @@ export default function App() {
 
                   {activeAdminTab === 'payments' && (
                     <PaymentSettingsModule />
-                  )}
-
-                  {activeAdminTab === 'receipts' && (
-                    <PaymentReceiptsModule />
                   )}
                 </main>
 

@@ -108,6 +108,24 @@ export const AITeamSection: React.FC<AITeamSectionProps> = ({
   const [copied, setCopied] = useState(false);
   const [copiedSummary, setCopiedSummary] = useState(false);
   const [activeTab, setActiveTab] = useState<'overview' | 'research' | 'marketing' | 'kaspPlan'>('overview');
+  
+  // Smart Goal Clarification (Step 2: Understanding the goal)
+  const [showClarification, setShowClarification] = useState(false);
+  const [businessStage, setBusinessStage] = useState<string>('');
+  const [salesModel, setSalesModel] = useState<string>('');
+  const [budgetRange, setBudgetRange] = useState<string>('');
+
+  const getFullEnrichedGoal = (baseGoal?: string) => {
+    let target = (baseGoal || goal).trim();
+    const details: string[] = [];
+    if (businessStage) details.push(`مرحله: ${businessStage}`);
+    if (salesModel) details.push(`مدل فروش: ${salesModel}`);
+    if (budgetRange) details.push(`بودجه: ${budgetRange}`);
+    if (details.length > 0) {
+      target += ` (اطلاعات تکمیلی: ${details.join(' | ')})`;
+    }
+    return target;
+  };
 
   // Monetization & Credit state
   const [userStatus, setUserStatus] = useState<{
@@ -223,7 +241,7 @@ export const AITeamSection: React.FC<AITeamSectionProps> = ({
   };
 
   const handleGetPreview = async (selectedGoal?: string) => {
-    const targetGoal = (selectedGoal || goal).trim();
+    const targetGoal = getFullEnrichedGoal(selectedGoal);
     if (!targetGoal) return;
 
     setIsPreviewLoading(true);
@@ -250,7 +268,7 @@ export const AITeamSection: React.FC<AITeamSectionProps> = ({
   };
 
   const handleRunTeam = async (selectedGoal?: string) => {
-    const targetGoal = (selectedGoal || goal).trim();
+    const targetGoal = getFullEnrichedGoal(selectedGoal);
     if (!targetGoal) return;
 
     setIsLoading(true);
@@ -514,6 +532,11 @@ ${(report.sources && report.sources.length > 0)
   ? report.sources.map(s => `• ${s.title}: ${s.url} (${s.claim})`).join('\n') 
   : 'تمامی داده‌ها و استنتاجات حاصل تحلیل ساختاری و شبیه‌سازی بازار است.'}
 
+------------------------------------------------------------
+۱۵. توصیه مستقیم مدیر ارشد KASP («اگر من جای شما بودم...»):
+------------------------------------------------------------
+${report.managerDirectAdvice || 'اولین اقدام شما باید تست ملموس پیشنهاد ارزش با کمترین هزینه و اعتبارسنجی فرضیه تمایل به خرید باشد. از انباشت هزینه روی زیرساخت پیش از تایید تقاضای واقعی اجتناب کنید.'}
+
 ============================================================
 KASP - دستیار هوشمند تحقیق، تحلیل و برنامه‌ریزی کسب‌وکار
 ============================================================
@@ -704,7 +727,7 @@ ${(report.actionPlan30Days || []).slice(0, 2).map(p => `• [${p.timeframe}] ${p
                 چه مواردی دریافت می‌کنید؟
               </span>
               <p className="text-slate-400 leading-relaxed">
-                سند ۱۴ بخشی: ارزیابی فرصت (KASP Score)، تحلیل رقبا، پرسونای خریدار، قیمت‌گذاری و حاشیه سود، قیف فروش، قلاب‌های تبلیغاتی و نقشه ۳۰ روزه.
+                سند ۱۵ بخشی: ارزیابی فرصت (KASP Score)، تحلیل رقبا، پرسونای خریدار، قیمت‌گذاری و حاشیه سود، قیف فروش، قلاب‌های تبلیغاتی، نقشه ۳۰ روزه و توصیه استراتژیک مستقیم.
               </p>
             </div>
 
@@ -776,7 +799,7 @@ ${(report.actionPlan30Days || []).slice(0, 2).map(p => `• [${p.timeframe}] ${p
           </div>
 
           {/* Quick inspiration chips */}
-          <div className="flex flex-wrap items-center gap-2 mb-5">
+          <div className="flex flex-wrap items-center gap-2 mb-4">
             <span className="text-xs text-slate-400 font-bold flex items-center gap-1">
               <Sparkles className="w-3.5 h-3.5 text-amber-400" />
               نمونه‌های پیشنهادی:
@@ -795,6 +818,90 @@ ${(report.actionPlan30Days || []).slice(0, 2).map(p => `• [${p.timeframe}] ${p
                 {sample}
               </button>
             ))}
+          </div>
+
+          {/* Smart Goal Clarification (Step 2: Understanding Goal) */}
+          <div className="mb-5 bg-slate-900/80 p-3.5 rounded-2xl border border-slate-700/60">
+            <button
+              type="button"
+              onClick={() => setShowClarification(!showClarification)}
+              className="w-full flex items-center justify-between text-xs font-bold text-indigo-300 hover:text-indigo-200 transition-colors"
+            >
+              <span className="flex items-center gap-1.5">
+                <BrainCircuit className="w-3.5 h-3.5 text-indigo-400" />
+                <span>تدقیق هوشمند هدف (پاسخ به ۳ سوال اختیاری جهت افزایش دقت تحلیل KASP)</span>
+              </span>
+              <span className="text-[11px] px-2 py-0.5 rounded-md bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                {showClarification ? 'بستن' : (businessStage || salesModel || budgetRange ? 'ویرایش اطلاعات' : 'پاسخ اختیاری')}
+              </span>
+            </button>
+
+            {showClarification && (
+              <div className="mt-3 pt-3 border-t border-slate-800 space-y-3 animate-fadeIn text-xs">
+                {/* Q1: Stage */}
+                <div>
+                  <span className="text-slate-400 block mb-1.5 font-bold">۱. مرحله فعلی کسب‌وکار شما:</span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {['ایده اولیه و راه‌اندازی', 'محصول آماده فروش', 'کسب‌وکار فعال و در حال رشد'].map((stage) => (
+                      <button
+                        key={stage}
+                        type="button"
+                        onClick={() => setBusinessStage(businessStage === stage ? '' : stage)}
+                        className={`px-3 py-1 rounded-lg text-[11px] font-bold transition-colors ${
+                          businessStage === stage
+                            ? 'bg-indigo-600 text-white shadow-sm'
+                            : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                        }`}
+                      >
+                        {stage}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Q2: Sales Channel */}
+                <div>
+                  <span className="text-slate-400 block mb-1.5 font-bold">۲. کانال اصلی فروش یا ارائه:</span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {['فروشگاه آنلاین و شبکه‌های اجتماعی', 'فروش B2B و شرکتی', 'خدمات و مشاوره تخصصی'].map((model) => (
+                      <button
+                        key={model}
+                        type="button"
+                        onClick={() => setSalesModel(salesModel === model ? '' : model)}
+                        className={`px-3 py-1 rounded-lg text-[11px] font-bold transition-colors ${
+                          salesModel === model
+                            ? 'bg-purple-600 text-white shadow-sm'
+                            : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                        }`}
+                      >
+                        {model}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Q3: Budget */}
+                <div>
+                  <span className="text-slate-400 block mb-1.5 font-bold">۳. بودجه تخمینی اولیه برای شروع یا توسعه:</span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {['کمتر از ۳۰ میلیون تومان', '۳۰ تا ۱۰۰ میلیون تومان', 'بیش از ۱۰۰ میلیون تومان'].map((bgt) => (
+                      <button
+                        key={bgt}
+                        type="button"
+                        onClick={() => setBudgetRange(budgetRange === bgt ? '' : bgt)}
+                        className={`px-3 py-1 rounded-lg text-[11px] font-bold transition-colors ${
+                          budgetRange === bgt
+                            ? 'bg-emerald-600 text-white shadow-sm'
+                            : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                        }`}
+                      >
+                        {bgt}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-2 border-t border-slate-700/60">
@@ -960,7 +1067,7 @@ ${(report.actionPlan30Days || []).slice(0, 2).map(p => `• [${p.timeframe}] ${p
             {/* Comparison: Preview vs Full Report */}
             <div className="bg-slate-950/80 p-5 rounded-2xl border border-slate-800 space-y-3">
               <div className="flex items-center justify-between">
-                <h4 className="text-xs font-bold text-slate-300">مقایسه پیش‌نمایش با گزارش جامع ۱۴ بخشی:</h4>
+                <h4 className="text-xs font-bold text-slate-300">مقایسه پیش‌نمایش با گزارش جامع ۱۵ بخشی:</h4>
                 <span className="text-[11px] text-amber-400 font-bold">ارزش افزوده نسخه کامل</span>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
@@ -978,7 +1085,7 @@ ${(report.actionPlan30Days || []).slice(0, 2).map(p => `• [${p.timeframe}] ${p
                 </div>
                 <div className="p-2.5 rounded-xl bg-emerald-950/40 border border-emerald-500/30 text-emerald-200 font-bold flex items-center gap-2">
                   <CheckCircle className="w-4 h-4 text-emerald-400 shrink-0" />
-                  <span>گزارش کامل: قیف فروش، قلاب‌های تبلیغاتی، نقشه راه ۳۰ روزه و کپی گزارش</span>
+                  <span>گزارش کامل: قیف فروش، قلاب‌های تبلیغاتی، نقشه ۳۰ روزه و توصیه مستقیم مدیر</span>
                 </div>
               </div>
             </div>
@@ -988,7 +1095,7 @@ ${(report.actionPlan30Days || []).slice(0, 2).map(p => `• [${p.timeframe}] ${p
               <div className="space-y-1 text-center sm:text-right">
                 <h4 className="text-sm font-black text-white flex items-center justify-center sm:justify-start gap-2">
                   <span>قفل‌گشایی گزارش جامع هوش تجاری و استراتژی اجرایی</span>
-                  <span className="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 text-[10px] font-bold">۱۴ بخش اختصاصی</span>
+                  <span className="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 text-[10px] font-bold">۱۵ بخش اختصاصی</span>
                 </h4>
                 <p className="text-xs text-slate-400">
                   تحقیق زنده با Google Search Grounding، مدل‌سازی قیمت و حاشیه سود، و نقشه اقدام هفته به هفته
@@ -1086,7 +1193,7 @@ ${(report.actionPlan30Days || []).slice(0, 2).map(p => `• [${p.timeframe}] ${p
                 <button
                   onClick={handleCopyReport}
                   className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold rounded-xl border border-slate-700 flex items-center gap-1.5 transition-all"
-                  title="کپی متن کامل گزارش ۱۴ بخشی"
+                  title="کپی متن کامل گزارش ۱۵ بخشی"
                 >
                   {copied ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
                   <span>{copied ? 'کپی شد!' : 'Copy Report'}</span>
@@ -1302,6 +1409,22 @@ ${(report.actionPlan30Days || []).slice(0, 2).map(p => `• [${p.timeframe}] ${p
                       )}
                     </div>
 
+                  </div>
+
+                  {/* 15. MANAGER DIRECT ADVICE ("اگر من جای شما بودم...") */}
+                  <div className="bg-gradient-to-r from-amber-950/40 via-indigo-950/40 to-slate-900 border-2 border-amber-500/50 rounded-3xl p-6 sm:p-7 shadow-xl relative overflow-hidden">
+                    <div className="flex items-center justify-between gap-3 mb-3">
+                      <div className="flex items-center gap-2.5 text-amber-400 font-black text-sm sm:text-base">
+                        <Sparkles className="w-5 h-5 text-amber-400 shrink-0" />
+                        <span>۱۵. توصیه استراتژیک مدیر ارشد KASP: «اگر من جای شما بودم...»</span>
+                      </div>
+                      <span className="text-[11px] px-3 py-1 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 font-bold shrink-0">
+                        تصمیم و جهت‌گیری کلیدی
+                      </span>
+                    </div>
+                    <div className="text-slate-100 text-sm sm:text-base leading-relaxed whitespace-pre-line font-medium bg-slate-950/60 p-4 rounded-2xl border border-amber-500/20">
+                      {report.managerDirectAdvice || 'اگر من جای شما بودم، به جای اینکه سرمایه زیادی صرف خرید اولیه انبار یا ساخت سیستم‌های پیچیده کنم، ابتدا یک پیشنهاد فوق‌العاده شفاف (Irresistible Offer) با تست ویدئویی ملموس آماده می‌کردم. اولین فروش را با موجودی محدود محقق می‌کردم تا هزینه جذب واقعی (CAC) و دغدغه واقعی مشتریان کشف شود. بزرگ‌ترین تله در این حوزه، خواب سرمایه روی تنوع کالا پیش از اثبات تقاضای پایدار است.'}
+                    </div>
                   </div>
 
                   {/* 1. Executive Summary */}

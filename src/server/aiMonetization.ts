@@ -221,31 +221,7 @@ export async function markAIOrderFailed(params: {
   return true;
 }
 
-/**
- * Idempotently confirms payment for an AI order when receipt is approved by Admin.
- */
-export async function confirmAIOrderPayment(receiptId: string, orderId?: string): Promise<boolean> {
-  // Find order by orderId or receiptId
-  let order: any = null;
-  if (orderId) {
-    order = await queryOne("SELECT * FROM ai_orders WHERE id = ?", [orderId]);
-  }
-  if (!order && receiptId) {
-    order = await queryOne("SELECT * FROM ai_orders WHERE receiptId = ? OR id = (SELECT orderId FROM payment_receipts WHERE id = ?)", [receiptId, receiptId]);
-  }
 
-  if (!order) {
-    return false;
-  }
-
-  const res = await markAIOrderPaid({
-    orderId: order.id,
-    receiptId,
-    gateway: 'card_to_card'
-  });
-
-  return res.success;
-}
 
 /**
  * Lightweight, fast free preview generator for any visitor / user.

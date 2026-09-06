@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 import { KaspLogo } from '../KaspLogo';
 
-export type AdminTab = 'dashboard' | 'users' | 'agents' | 'services' | 'banners' | 'tickets' | 'crm' | 'discounts' | 'payments' | 'receipts' | 'settings';
+export type AdminTab = 'dashboard' | 'users' | 'agents' | 'services' | 'banners' | 'tickets' | 'crm' | 'discounts' | 'payments' | 'settings';
 
 interface SidebarProps {
   activeAdminTab: AdminTab;
@@ -75,13 +75,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
     },
     {
       id: 'payments',
-      label: 'تنظیمات پرداخت',
+      label: 'تنظیمات پرداخت (زیبال)',
       icon: <CreditCard className="w-4 h-4" />
-    },
-    {
-      id: 'receipts',
-      label: 'رسیدهای پرداخت',
-      icon: <FileCheck className="w-4 h-4" />
     },
     {
       id: 'settings',

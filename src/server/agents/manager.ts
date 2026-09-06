@@ -376,6 +376,7 @@ ${JSON.stringify(marketing)}
     "rationale": "دلیل صریح و مستدل وضعیت انتخابی با توجه به هزینه‌ها و رقبا",
     "keyAssumptionsToValidate": ["فرض اساسی ۱", "فرض اساسی ۲"]
   },
+  "managerDirectAdvice": "اگر من جای شما بودم... (توصیه مستقیم، بی‌پرده و استراتژیک مدیر KASP درباره اولین قدم عملیاتی، بزرگترین تله‌ای که نباید در آن بیفتید، و شیوه بهینه‌سازی فروش در ۲ تا ۳ پاراگراف عمیق)",
   "kaspActionSuggestions": ["اقدام ۱", "اقدام ۲", "اقدام ۳"]
 }
 پاسخ فقط به صورت JSON معتبر باشد.`;
@@ -387,6 +388,7 @@ ${JSON.stringify(marketing)}
     let kaspScore: KaspScore | null = null;
     let kaspVerdict: KaspVerdict | null = null;
     let kaspActionSteps: string[] = [];
+    let managerDirectAdvice = '';
 
     try {
       const resp = await generateWithGemini(prompt, this.instructions, true);
@@ -394,6 +396,7 @@ ${JSON.stringify(marketing)}
         const parsed = JSON.parse(resp);
         synthesizedSummary = parsed.executiveSummary || '';
         synthesizedAnalysis = parsed.ideaAndProductAnalysis || '';
+        managerDirectAdvice = parsed.managerDirectAdvice || '';
         if (parsed.pricingStrategy && typeof parsed.pricingStrategy === 'object') {
           pricingStrategy = parsed.pricingStrategy;
         }
@@ -508,14 +511,19 @@ ${JSON.stringify(marketing)}
       kaspActionSteps = actionPlan30Days.slice(0, 4).map(item => `${item.timeframe}: ${item.action}`);
     }
 
+    if (!managerDirectAdvice) {
+      managerDirectAdvice = `اگر من جای شما بودم، به جای اینکه سرمایه زیادی صرف خرید اولیه انبار یا ساخت سیستم‌های پیچیده کنم، ابتدا یک پیشنهاد فوق‌العاده شفاف (Irresistible Offer) با تست ویدئویی ملموس آماده می‌کردم. اولین فروش را به صورت دستی یا با موجودی محدود (کمتر از ۱۰ واحد) محقق می‌کردم تا هزینه جذب واقعی (CAC) و دغدغه واقعی مشتریان کشف شود. بزرگ‌ترین تله در این حوزه، خواب سرمایه روی تنوع کالا پیش از اثبات تقاضای پایدار است؛ تمرکز روی یک محصول قهرمان (Hero Product) با ارسال فوری و گارانتی اصالت، برنده اصلی بازار خواهد بود.`;
+    }
+
     return {
       id: projectId,
       businessGoal: rawGoal,
       createdAt: new Date().toISOString(),
       
-      // 14 Core Sections of KASP Business Intelligence Report
+      // 15 Core Sections of KASP Business Intelligence Report
       executiveSummary: synthesizedSummary,
       ideaAndProductAnalysis: synthesizedAnalysis,
+      managerDirectAdvice: managerDirectAdvice,
       targetCustomers: {
         summary: `شناسایی ${(customer?.targetAudience || []).length} دسته مخاطب هدف کلیدی.`,
         personas: customer?.targetAudience || []

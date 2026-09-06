@@ -185,6 +185,7 @@ export interface FinalBusinessReport {
   };
   kaspVerdict: KaspVerdict; // 13. نتیجه نهایی KASP
   kaspScore: KaspScore; // امتیازدهی KASP
+  managerDirectAdvice?: string; // 15. اگر من جای شما بودم... (توصیه بی‌پرده و استراتژیک مدیر KASP)
   groundedFactsVsEstimates?: { // 14. منابع، شواهد و تفکیک داده‌ها
     verifiedFacts: string[];
     groundedEstimates: string[];

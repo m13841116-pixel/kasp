@@ -13,7 +13,6 @@ import {
   consumeCreditSafely, 
   rollbackCredit, 
   createAIOrder, 
-  confirmAIOrderPayment, 
   generateAIPreview,
   markAIOrderPaid,
   markAIOrderFailed
@@ -23,7 +22,9 @@ import {
   verifyZibalPayment,
   getZibalMerchant,
   getZibalBaseUrl,
-  getZibalConfigStatus
+  getZibalConfigStatus,
+  getZibalMode,
+  logPaymentDiagnostic
 } from './payments/zibal.js';
 
 const router = Router();
@@ -412,21 +413,10 @@ router.post('/app-requests', async (req, res) => {
 });
 
 router.get('/payments/settings', async (req, res) => {
-  const settings = await queryOne("SELECT bankName, cardNumber, accountHolder, iban, isOnlineGatewayActive FROM payment_settings LIMIT 1");
-  if (settings) {
-    settings.isOnlineGatewayActive = true;
-    settings.provider = 'zibal';
-    res.json(settings);
-  } else {
-    res.json({
-      bankName: 'بانک ملی ایران',
-      cardNumber: '6037-9919-8822-4411',
-      accountHolder: 'توسعه هوش تجاری کاسپ (KASP)',
-      iban: 'IR890170000000123456789001',
-      isOnlineGatewayActive: true,
-      provider: 'zibal'
-    });
-  }
+  res.json({
+    isOnlineGatewayActive: true,
+    provider: 'zibal'
+  });
 });
 
 // Zibal Payment Request Schema
@@ -471,24 +461,48 @@ const handleZibalPaymentRequest = async (req: Request, res: Response) => {
       return res.status(500).json({ error: 'خطا در بارگذاری یا ایجاد سفارش.' });
     }
 
+    logPaymentDiagnostic({
+      ORDER_ID: order.id,
+      TRACK_ID: 'N/A',
+      PAYMENT_STEP: 'CREATE_ORDER',
+      HTTP_STATUS: 200,
+      ZIBAL_RESPONSE_CODE: 'N/A',
+      STATUS: 'SUCCESS',
+      ERROR_CATEGORY: 'NONE'
+    });
+
     // Determine absolute callback URL
     let callbackUrl = process.env.ZIBAL_CALLBACK_URL?.trim();
+    const host = (req.get('host') || 'localhost:3000').toLowerCase();
+    const protocol = (req.headers['x-forwarded-proto'] as string) || (req.secure ? 'https' : 'http');
+    const mode = getZibalMode();
+
     if (!callbackUrl) {
-      const host = req.get('host') || 'localhost:3000';
-      const protocol = (req.headers['x-forwarded-proto'] as string) || (req.secure ? 'https' : 'http');
-      callbackUrl = `${protocol}://${host}/api/payment/zibal/callback`;
+      if (host.includes('kasp.ir')) {
+        callbackUrl = `${protocol}://${host}/api/payment/zibal/callback`;
+      } else if (mode === 'production') {
+        // In production mode, Zibal requires registered merchant domain (kasp.ir).
+        // Default to production domain and pass returnUrl for smooth redirection.
+        callbackUrl = `https://www.kasp.ir/api/payment/zibal/callback`;
+      } else {
+        callbackUrl = `${protocol}://${host}/api/payment/zibal/callback`;
+      }
     }
 
-    // Explicitly attach orderId parameter to callbackUrl for bulletproof order lookup
+    // Explicitly attach orderId and optional returnUrl parameters to callbackUrl
     let finalCallbackUrl = callbackUrl;
     try {
       const parsedUrl = new URL(callbackUrl);
       parsedUrl.searchParams.set('orderId', order.id);
+      if (!host.includes('kasp.ir') && mode === 'production') {
+        parsedUrl.searchParams.set('returnUrl', `${protocol}://${host}`);
+      }
       finalCallbackUrl = parsedUrl.toString();
     } catch {
+      const extraParams = `orderId=${encodeURIComponent(order.id)}${!host.includes('kasp.ir') && mode === 'production' ? `&returnUrl=${encodeURIComponent(`${protocol}://${host}`)}` : ''}`;
       finalCallbackUrl = callbackUrl.includes('?')
-        ? `${callbackUrl}&orderId=${encodeURIComponent(order.id)}`
-        : `${callbackUrl}?orderId=${encodeURIComponent(order.id)}`;
+        ? `${callbackUrl}&${extraParams}`
+        : `${callbackUrl}?${extraParams}`;
     }
 
     const zibalResult = await requestZibalPayment({
@@ -540,11 +554,36 @@ const handleZibalCallback = async (req: Request, res: Response) => {
     const success = source.success ? String(source.success) : '';
     const status = source.status ? String(source.status) : '';
     const orderId = source.orderId ? String(source.orderId) : '';
+    const returnUrl = source.returnUrl ? String(source.returnUrl) : '';
 
-    console.info(`[Zibal Callback] method=${req.method}, trackId=${trackId}, success=${success}, status=${status}, orderId=${orderId}`);
+    const buildRedirectUrl = (params: Record<string, string>) => {
+      const qs = new URLSearchParams(params).toString();
+      if (returnUrl) {
+        try {
+          const parsed = new URL(returnUrl);
+          const isAllowedHost = parsed.hostname.endsWith('run.app') || 
+                                parsed.hostname.endsWith('kasp.ir') || 
+                                parsed.hostname === 'localhost' || 
+                                parsed.hostname === '127.0.0.1';
+          if (isAllowedHost && (parsed.protocol === 'http:' || parsed.protocol === 'https:')) {
+            return `${parsed.origin}/?${qs}`;
+          }
+        } catch {}
+      }
+      return `/?${qs}`;
+    };
 
     if (!trackId && !orderId) {
-      return res.redirect('/?paymentStatus=error&message=' + encodeURIComponent('اطلاعات تراکنش ارسالی از درگاه ناقص است.'));
+      logPaymentDiagnostic({
+        ORDER_ID: 'N/A',
+        TRACK_ID: 'N/A',
+        PAYMENT_STEP: 'CALLBACK_RECEIVE',
+        HTTP_STATUS: 400,
+        ZIBAL_RESPONSE_CODE: 'N/A',
+        STATUS: 'FAILURE',
+        ERROR_CATEGORY: 'MISSING_TRANSACTION_PARAMS'
+      });
+      return res.redirect(buildRedirectUrl({ paymentStatus: 'error', message: 'اطلاعات تراکنش ارسالی از درگاه ناقص است.' }));
     }
 
     // Find order by orderId or trackId
@@ -557,44 +596,68 @@ const handleZibalCallback = async (req: Request, res: Response) => {
     }
 
     if (!order) {
-      console.warn(`[Zibal Callback] Order not found for trackId=${trackId}, orderId=${orderId}`);
-      return res.redirect('/?paymentStatus=error&message=' + encodeURIComponent('سفارش مرتبط با این تراکنش یافت نشد.'));
+      logPaymentDiagnostic({
+        ORDER_ID: orderId || 'N/A',
+        TRACK_ID: trackId || 'N/A',
+        PAYMENT_STEP: 'CALLBACK_RECEIVE',
+        HTTP_STATUS: 404,
+        ZIBAL_RESPONSE_CODE: 'N/A',
+        STATUS: 'FAILURE',
+        ERROR_CATEGORY: 'ORDER_NOT_FOUND'
+      });
+      return res.redirect(buildRedirectUrl({ paymentStatus: 'error', message: 'سفارش مرتبط با این تراکنش یافت نشد.' }));
     }
+
+    logPaymentDiagnostic({
+      ORDER_ID: order.id,
+      TRACK_ID: trackId || order.trackId || 'N/A',
+      PAYMENT_STEP: 'CALLBACK_RECEIVE',
+      HTTP_STATUS: 200,
+      ZIBAL_RESPONSE_CODE: status || (success === '1' ? 1 : 0),
+      STATUS: success === '1' ? 'SUCCESS' : 'FAILURE',
+      ERROR_CATEGORY: success === '1' ? 'NONE' : (status === '3' ? 'USER_CANCELLED' : 'GATEWAY_DECLINED')
+    });
 
     // 1. IDEMPOTENCY CHECK: If already marked PAID, safely redirect without duplicate credits
     if (String(order.status || '').toUpperCase() === 'PAID') {
-      console.info(`[Zibal Callback] Order ${order.id} is ALREADY paid. Duplicate credit prevented.`);
-      return res.redirect(`/?paymentStatus=success&orderId=${order.id}&alreadyPaid=true&refNumber=${order.refNumber || ''}`);
+      logPaymentDiagnostic({
+        ORDER_ID: order.id,
+        TRACK_ID: trackId || order.trackId || 'N/A',
+        PAYMENT_STEP: 'CREDIT_GRANT',
+        HTTP_STATUS: 200,
+        ZIBAL_RESPONSE_CODE: 'N/A',
+        STATUS: 'SUCCESS',
+        ERROR_CATEGORY: 'ALREADY_PAID_IDEMPOTENT'
+      });
+      return res.redirect(buildRedirectUrl({ paymentStatus: 'success', orderId: order.id, alreadyPaid: 'true', refNumber: order.refNumber || '' }));
     }
 
     // 2. Gateway failure check: user cancelled or payment failed at PSP
-    // In Zibal: success=1 indicates payment completed on bank page; success=0 or status=3 indicates cancelled/failed
     if (success !== '1' || status === '3') {
-      console.warn(`[Zibal Callback] Transaction cancelled or failed on gateway for order ${order.id}`);
       await markAIOrderFailed({
         orderId: order.id,
         trackId,
         reason: 'تراکنش در درگاه پرداخت لغو شد یا ناموفق بود.',
         status: status === '3' ? 'CANCELLED' : 'FAILED'
       });
-      return res.redirect(`/?paymentStatus=cancelled&orderId=${order.id}`);
+      return res.redirect(buildRedirectUrl({ paymentStatus: 'cancelled', orderId: order.id }));
     }
 
     // 3. Strict Server-Side Verification with Zibal (Routed via Fixed-IP Proxy if configured)
     const verifyResult = await verifyZibalPayment({
       trackId,
-      expectedAmountInTomans: Number(order.amount)
+      expectedAmountInTomans: Number(order.amount),
+      orderId: order.id
     });
 
     if (!verifyResult.success) {
-      console.error(`[Zibal Callback] Verify failed for order ${order.id}:`, verifyResult.error);
       await markAIOrderFailed({
         orderId: order.id,
         trackId,
         reason: verifyResult.error || 'تراکنش توسط درگاه زیبال تأیید نشد.',
         status: 'FAILED'
       });
-      return res.redirect(`/?paymentStatus=failed&orderId=${order.id}&reason=${encodeURIComponent(verifyResult.error || 'تأیید پرداخت ناموفق بود')}`);
+      return res.redirect(buildRedirectUrl({ paymentStatus: 'failed', orderId: order.id, reason: verifyResult.error || 'تأیید پرداخت ناموفق بود' }));
     }
 
     // 4. Mark order as PAID and grant exactly 1 credit idempotently
@@ -606,8 +669,17 @@ const handleZibalCallback = async (req: Request, res: Response) => {
       gateway: 'zibal'
     });
 
-    console.info(`[Zibal Callback] Order ${order.id} successfully PAID. Ref: ${verifyResult.refNumber}. 1 Credit granted.`);
-    return res.redirect(`/?paymentStatus=success&orderId=${order.id}&refNumber=${verifyResult.refNumber}`);
+    logPaymentDiagnostic({
+      ORDER_ID: order.id,
+      TRACK_ID: trackId || verifyResult.refNumber || 'N/A',
+      PAYMENT_STEP: 'CREDIT_GRANT',
+      HTTP_STATUS: 200,
+      ZIBAL_RESPONSE_CODE: 'N/A',
+      STATUS: 'SUCCESS',
+      ERROR_CATEGORY: 'NONE'
+    });
+
+    return res.redirect(buildRedirectUrl({ paymentStatus: 'success', orderId: order.id, refNumber: verifyResult.refNumber || '' }));
   } catch (err: any) {
     console.error('[Zibal Callback] Exception:', err);
     return res.redirect('/?paymentStatus=error&message=' + encodeURIComponent('خطای غیرمنتظره در پردازش نتیجه پرداخت زیبال.'));
@@ -646,44 +718,8 @@ router.get('/payments/zibal/order-status/:orderId', async (req, res) => {
   }
 });
 
-const receiptSchema = z.object({
-  customerName: z.string().optional(),
-  trackingCode: z.string().min(4),
-  senderName: z.string().min(2),
-  amount: z.string().min(1),
-  receiptImage: z.string().max(5000000).optional(), // Max 5MB length for base64 image
-  note: z.string().optional(),
-  orderId: z.string().optional(),
-  productType: z.string().optional(),
-  productCode: z.string().optional()
-});
-
 router.post('/payments/submit-receipt', async (req, res) => {
-  try {
-    const parsed = receiptSchema.parse(req.body);
-    const id = crypto.randomUUID();
-    const user = await getSessionUser(req);
-    const userId = user?.id || 'guest';
-    let customerName = parsed.customerName || 'مهمان';
-    if (userId !== 'guest' && user) {
-      customerName = user.name;
-    }
-    
-    await execute("INSERT INTO payment_receipts (id, userId, customerName, trackingCode, senderName, amount, receiptImage, note, status, orderId, productType, productCode) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", [
-      id, userId, customerName, parsed.trackingCode, parsed.senderName, parsed.amount, parsed.receiptImage || '', parsed.note || '', 'pending', parsed.orderId || null, parsed.productType || null, parsed.productCode || null
-    ]);
-
-    // If receipt is for an AI Order, link receiptId
-    if (parsed.orderId) {
-      try {
-        await execute("UPDATE ai_orders SET receiptId = ? WHERE id = ?", [id, parsed.orderId]);
-      } catch (e) {}
-    }
-
-    res.status(201).json({ id, customerName, ...parsed, status: 'pending', userId, success: true, message: 'رسید شما با موفقیت ثبت شد و در انتظار تایید است.' });
-  } catch(error: any) {
-    res.status(400).json({ error: 'اطلاعات نامعتبر است' });
-  }
+  return res.status(400).json({ error: 'پرداخت منحصراً از طریق درگاه آنلاین شاپرک زیبال صورت می‌پذیرد.' });
 });
 
 router.get('/customer/dashboard', async (req, res) => {
@@ -692,7 +728,6 @@ router.get('/customer/dashboard', async (req, res) => {
   const userId = user.id;
   
   const tickets = (await queryAll("SELECT * FROM tickets WHERE userId = ?", [userId])) || [];
-  const receipts = (await queryAll("SELECT * FROM payment_receipts WHERE userId = ? ORDER BY id DESC", [userId])) || [];
   const requests = (await queryAll("SELECT * FROM app_requests WHERE contactInfo LIKE ? OR userName LIKE ?", [`%${user.email}%`, `%${user.name}%`])) || [];
   
   const allDiscounts = (await queryAll("SELECT * FROM discount_codes ORDER BY createdAt DESC")) || [];
@@ -728,7 +763,7 @@ router.get('/customer/dashboard', async (req, res) => {
     user: { id: user.id, name: user.name, email: user.email, role: user.role }, 
     requests, 
     tickets, 
-    receipts, 
+    receipts: [], 
     discountCodes,
     aiEntitlements,
     aiOrders,
@@ -908,34 +943,7 @@ router.post('/admin/payment-settings', isAdmin, async (req, res) => {
   }
 });
 
-router.get('/admin/payment-receipts', isAdmin, async (req, res) => res.json(await queryAll("SELECT * FROM payment_receipts")));
 
-const statusUpdateSchema = z.object({
-  status: z.string().min(1)
-});
-
-router.put('/admin/payment-receipts/:id', isAdmin, async (req, res) => {
-  try {
-    const parsed = statusUpdateSchema.parse(req.body);
-    const receiptId = String(req.params.id);
-    await execute("UPDATE payment_receipts SET status = ? WHERE id = ?", [parsed.status, receiptId]);
-
-    if (parsed.status === 'confirmed') {
-      // Idempotently activate credits for linked AI order
-      const receipt = await queryOne("SELECT * FROM payment_receipts WHERE id = ?", [receiptId]);
-      await confirmAIOrderPayment(receiptId, receipt?.orderId ? String(receipt.orderId) : undefined);
-    } else if (parsed.status === 'rejected') {
-      const receipt = await queryOne("SELECT * FROM payment_receipts WHERE id = ?", [receiptId]);
-      if (receipt?.orderId) {
-        await execute("UPDATE ai_orders SET status = 'rejected' WHERE id = ?", [String(receipt.orderId)]);
-      }
-    }
-
-    res.json({ success: true });
-  } catch (err) {
-    res.status(400).json({ error: 'اطلاعات نامعتبر است' });
-  }
-});
 
 const bannerConfigUpdateSchema = z.object({
   text: z.string().optional(),

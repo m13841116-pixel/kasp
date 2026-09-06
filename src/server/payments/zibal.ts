@@ -26,6 +26,65 @@ export interface ZibalPaymentRequestResult {
 export interface ZibalVerifyParams {
   trackId: string | number;
   expectedAmountInTomans: number;
+  orderId?: string;
+}
+
+export interface PaymentDiagnosticLog {
+  ORDER_ID: string;
+  TRACK_ID: string;
+  PAYMENT_STEP: 'CREATE_ORDER' | 'REQUEST' | 'CALLBACK_RECEIVE' | 'VERIFY' | 'CREDIT_GRANT';
+  HTTP_STATUS: number | string;
+  ZIBAL_RESPONSE_CODE: number | string;
+  STATUS: 'SUCCESS' | 'FAILURE';
+  ERROR_CATEGORY: string;
+}
+
+/**
+ * Server-side secure diagnostic logger.
+ * Strictly logs ONLY non-sensitive operational fields.
+ * NEVER logs amount, merchant, tokens, secrets, or banking information.
+ */
+export function logPaymentDiagnostic(diag: PaymentDiagnosticLog): void {
+  const safeLog = {
+    ORDER_ID: diag.ORDER_ID || 'N/A',
+    TRACK_ID: diag.TRACK_ID || 'N/A',
+    PAYMENT_STEP: diag.PAYMENT_STEP,
+    HTTP_STATUS: diag.HTTP_STATUS ?? 'N/A',
+    ZIBAL_RESPONSE_CODE: diag.ZIBAL_RESPONSE_CODE ?? 'N/A',
+    STATUS: diag.STATUS,
+    ERROR_CATEGORY: diag.ERROR_CATEGORY || 'NONE'
+  };
+  console.info(`[PAYMENT_DIAGNOSTIC] ${JSON.stringify(safeLog)}`);
+}
+
+/**
+ * Maps numeric Zibal result code to a standardized error category string for diagnostics.
+ */
+export function getDiagnosticErrorCategory(code: number, message?: string): string {
+  switch (code) {
+    case 100:
+      return 'NONE';
+    case 102:
+      return 'MERCHANT_NOT_FOUND';
+    case 103:
+      return 'MERCHANT_INACTIVE';
+    case 104:
+      return 'INVALID_MERCHANT_OR_IP';
+    case 105:
+      return 'INVALID_AMOUNT';
+    case 106:
+      return 'CALLBACK_DOMAIN_MISMATCH';
+    case 113:
+      return 'AMOUNT_EXCEEDS_LIMIT';
+    case 201:
+      return 'ALREADY_VERIFIED';
+    case 202:
+      return 'ORDER_NOT_PAID_OR_CANCELLED';
+    case 203:
+      return 'INVALID_TRACK_ID';
+    default:
+      return message ? `ZIBAL_ERROR_${code}` : `ERROR_CODE_${code}`;
+  }
 }
 
 export interface ZibalVerifyResult {
@@ -58,8 +117,7 @@ export function getZibalMode(): 'production' | 'sandbox' {
 export function getZibalMerchant(): string {
   const mode = getZibalMode();
   if (mode === 'sandbox') {
-    const merchant = process.env.ZIBAL_MERCHANT?.trim();
-    return (merchant && merchant !== 'zibal') ? merchant : 'zibal';
+    return 'zibal';
   }
   const merchant = process.env.ZIBAL_MERCHANT?.trim();
   if (merchant) {
@@ -230,20 +288,38 @@ export async function requestZibalPayment(
 
     clearTimeout(timeout);
 
-    if (!response.ok) {
-      const errorText = await response.text().catch(() => '');
-      console.error('[Zibal Payment] HTTP Error on request:', response.status, errorText);
+    let data: any = null;
+    try {
+      data = await response.json();
+    } catch {
+      const rawText = await response.text().catch(() => '');
+      logPaymentDiagnostic({
+        ORDER_ID: params.orderId,
+        TRACK_ID: 'N/A',
+        PAYMENT_STEP: 'REQUEST',
+        HTTP_STATUS: response.status,
+        ZIBAL_RESPONSE_CODE: 'NON_JSON',
+        STATUS: 'FAILURE',
+        ERROR_CATEGORY: 'PROXY_INVALID_JSON'
+      });
       return {
         success: false,
         result: response.status,
-        error: `خطای سرور زیبال (${response.status}). لطفاً دقایقی دیگر تلاش کنید.`
+        error: `پاسخ دریافتی از درگاه معتبر نبود (${response.status}).`
       };
     }
 
-    const data = await response.json();
-
-    if (data.result === 100 && data.trackId) {
+    if (response.ok && data.result === 100 && data.trackId) {
       const trackIdStr = String(data.trackId);
+      logPaymentDiagnostic({
+        ORDER_ID: params.orderId,
+        TRACK_ID: trackIdStr,
+        PAYMENT_STEP: 'REQUEST',
+        HTTP_STATUS: response.status,
+        ZIBAL_RESPONSE_CODE: 100,
+        STATUS: 'SUCCESS',
+        ERROR_CATEGORY: 'NONE'
+      });
       return {
         success: true,
         trackId: trackIdStr,
@@ -252,18 +328,40 @@ export async function requestZibalPayment(
         message: data.message
       };
     } else {
-      const errMsg = getZibalErrorMessage(Number(data.result)) || data.message || 'خطا در ثبت درخواست پرداخت در زیبال';
-      console.warn('[Zibal Payment] Gateway request rejected:', data.result, errMsg, data.message);
+      const resultCode = Number(data?.result) || response.status;
+      const errMsg = getZibalErrorMessage(resultCode) || data?.message || 'خطا در ثبت درخواست پرداخت در زیبال';
+      const category = getDiagnosticErrorCategory(resultCode, data?.message);
+
+      logPaymentDiagnostic({
+        ORDER_ID: params.orderId,
+        TRACK_ID: 'N/A',
+        PAYMENT_STEP: 'REQUEST',
+        HTTP_STATUS: response.status,
+        ZIBAL_RESPONSE_CODE: resultCode,
+        STATUS: 'FAILURE',
+        ERROR_CATEGORY: category
+      });
+
       return {
         success: false,
-        result: Number(data.result) || 0,
-        message: data.message,
+        result: resultCode,
+        message: data?.message,
         error: errMsg
       };
     }
   } catch (err: any) {
-    console.error('[Zibal Payment] Request exception:', err);
-    if (err?.name === 'AbortError') {
+    const isTimeout = err?.name === 'AbortError';
+    logPaymentDiagnostic({
+      ORDER_ID: params.orderId,
+      TRACK_ID: 'N/A',
+      PAYMENT_STEP: 'REQUEST',
+      HTTP_STATUS: isTimeout ? 504 : 500,
+      ZIBAL_RESPONSE_CODE: 'N/A',
+      STATUS: 'FAILURE',
+      ERROR_CATEGORY: isTimeout ? 'NETWORK_TIMEOUT' : 'CONNECTION_FAILED'
+    });
+
+    if (isTimeout) {
       return {
         success: false,
         result: 504,
@@ -287,10 +385,12 @@ export async function verifyZibalPayment(
 ): Promise<ZibalVerifyResult> {
   const merchant = getZibalMerchant();
   const apiBaseUrl = getZibalBaseUrl();
+  const orderId = params.orderId || 'N/A';
+  const trackIdStr = String(params.trackId);
 
   const payload = {
     merchant,
-    trackId: String(params.trackId)
+    trackId: trackIdStr
   };
 
   try {
@@ -306,18 +406,27 @@ export async function verifyZibalPayment(
 
     clearTimeout(timeout);
 
-    if (!response.ok) {
-      const errorText = await response.text().catch(() => '');
-      console.error('[Zibal Verify] HTTP error:', response.status, errorText);
+    let data: any = null;
+    try {
+      data = await response.json();
+    } catch {
+      logPaymentDiagnostic({
+        ORDER_ID: orderId,
+        TRACK_ID: trackIdStr,
+        PAYMENT_STEP: 'VERIFY',
+        HTTP_STATUS: response.status,
+        ZIBAL_RESPONSE_CODE: 'NON_JSON',
+        STATUS: 'FAILURE',
+        ERROR_CATEGORY: 'PROXY_INVALID_JSON'
+      });
       return {
         success: false,
         result: response.status,
-        error: `خطای سرور زیبال در تأیید تراکنش (${response.status})`
+        error: `پاسخ دریافتی از درگاه در تایید تراکنش معتبر نبود (${response.status})`
       };
     }
 
-    const data = await response.json();
-    const resultCode = Number(data.result);
+    const resultCode = Number(data?.result);
 
     // Code 100: Successfully verified
     // Code 201: Already verified (idempotent replay from Zibal)
@@ -327,13 +436,31 @@ export async function verifyZibalPayment(
 
       // STRICT AMOUNT VERIFICATION
       if (paidAmountRials !== expectedAmountRials) {
-        console.error('[Zibal Verify] Amount mismatch! Paid:', paidAmountRials, 'Expected:', expectedAmountRials);
+        logPaymentDiagnostic({
+          ORDER_ID: orderId,
+          TRACK_ID: trackIdStr,
+          PAYMENT_STEP: 'VERIFY',
+          HTTP_STATUS: response.status,
+          ZIBAL_RESPONSE_CODE: resultCode,
+          STATUS: 'FAILURE',
+          ERROR_CATEGORY: 'AMOUNT_MISMATCH'
+        });
         return {
           success: false,
           result: resultCode,
-          error: `عدم تطابق مبلغ تراکنش! مبلغ واریزی (${Math.round(paidAmountRials / 10)} تومان) با مبلغ سفارش (${params.expectedAmountInTomans} تومان) یکسان نیست.`
+          error: `عدم تطابق مبلغ تراکنش! مبلغ واریزی با مبلغ سفارش یکسان نیست.`
         };
       }
+
+      logPaymentDiagnostic({
+        ORDER_ID: orderId,
+        TRACK_ID: trackIdStr,
+        PAYMENT_STEP: 'VERIFY',
+        HTTP_STATUS: response.status,
+        ZIBAL_RESPONSE_CODE: resultCode,
+        STATUS: 'SUCCESS',
+        ERROR_CATEGORY: resultCode === 201 ? 'ALREADY_VERIFIED' : 'NONE'
+      });
 
       return {
         success: true,
@@ -345,8 +472,19 @@ export async function verifyZibalPayment(
         result: resultCode
       };
     } else {
-      const errMsg = getZibalErrorMessage(resultCode) || data.message || 'تراکنش توسط درگاه زیبال تایید نشد.';
-      console.warn('[Zibal Verify] Verification rejected:', resultCode, errMsg, data.message);
+      const errMsg = getZibalErrorMessage(resultCode) || data?.message || 'تراکنش توسط درگاه زیبال تایید نشد.';
+      const category = getDiagnosticErrorCategory(resultCode, data?.message);
+
+      logPaymentDiagnostic({
+        ORDER_ID: orderId,
+        TRACK_ID: trackIdStr,
+        PAYMENT_STEP: 'VERIFY',
+        HTTP_STATUS: response.status,
+        ZIBAL_RESPONSE_CODE: resultCode,
+        STATUS: 'FAILURE',
+        ERROR_CATEGORY: category
+      });
+
       return {
         success: false,
         result: resultCode,
@@ -354,8 +492,18 @@ export async function verifyZibalPayment(
       };
     }
   } catch (err: any) {
-    console.error('[Zibal Verify] Verify exception:', err);
-    if (err?.name === 'AbortError') {
+    const isTimeout = err?.name === 'AbortError';
+    logPaymentDiagnostic({
+      ORDER_ID: orderId,
+      TRACK_ID: trackIdStr,
+      PAYMENT_STEP: 'VERIFY',
+      HTTP_STATUS: isTimeout ? 504 : 500,
+      ZIBAL_RESPONSE_CODE: 'N/A',
+      STATUS: 'FAILURE',
+      ERROR_CATEGORY: isTimeout ? 'NETWORK_TIMEOUT' : 'CONNECTION_FAILED'
+    });
+
+    if (isTimeout) {
       return {
         success: false,
         result: 504,

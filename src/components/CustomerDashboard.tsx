@@ -334,17 +334,17 @@ export const CustomerDashboard: React.FC<{ onLogout: () => void, onViewReport: (
                           <td className="px-3 py-3 font-bold">{o.productName || 'گزارش هوش تجاری KASP'}</td>
                           <td className="px-3 py-3 font-mono">{(Number(o.amount) || 490000).toLocaleString('fa-IR')}</td>
                           <td className="px-3 py-3">
-                            {o.status === 'confirmed' ? (
+                            {String(o.status || '').toUpperCase() === 'PAID' || o.status === 'confirmed' ? (
                               <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
-                                ✓ تایید شده و فعال
+                                ✓ پرداخت موفق (زیبال)
                               </span>
-                            ) : o.status === 'pending' ? (
+                            ) : o.status === 'pending' || o.status === 'INIT' ? (
                               <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-500 border border-amber-500/20">
-                                ⏳ در انتظار تایید رسید
+                                ⏳ در انتظار پرداخت درگاه
                               </span>
                             ) : (
                               <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/10 text-rose-500 border border-rose-500/20">
-                                ✕ رد شده
+                                ✕ پرداخت ناموفق
                               </span>
                             )}
                           </td>
